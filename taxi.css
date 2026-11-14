@@ -1,0 +1,292 @@
+:root {
+  color-scheme: dark;
+  --night: #101923;
+  --night-2: #172433;
+  --panel: #1d2b39;
+  --panel-hi: #223446;
+  --ink: #edf0e9;
+  --muted: #9dacb4;
+  --dim: #71818b;
+  --brass: #d6ad70;
+  --green: #9ac0a1;
+  --blue: #a4c6d1;
+  --line: rgba(209, 195, 164, .15);
+  --shadow: 0 16px 42px rgba(2, 8, 15, .26);
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+  background: var(--night);
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-width: 320px; min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 42% -20%, rgba(116,151,164,.16), transparent 49%),
+    linear-gradient(180deg, #121e29, #101923 75%);
+}
+button, input { font: inherit; }
+button { color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #f1cf91; outline-offset: 3px; }
+a { color: inherit; }
+.topbar {
+  width: min(1540px,100%); min-height: 72px; margin: auto; padding: 10px 3.2%;
+  display: flex; align-items: center; gap: 20px; border-bottom: 1px solid rgba(229,226,209,.1);
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: 0 0 auto; }
+.brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #b78e58; border-radius: 50%; color: #e4c28a; font: 24px Georgia,serif; box-shadow: inset 0 0 0 3px rgba(214,173,112,.09); }
+.brand strong { display: block; font-size: 12px; font-weight: 650; letter-spacing: .2em; }
+.brand small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; letter-spacing: .12em; }
+.topbar-status { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.cash-chip, .rating-chip { min-height: 39px; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 7px; padding: 4px 11px; border: 1px solid var(--line); background: rgba(28,43,56,.69); }
+.cash-chip > span { grid-row: span 2; color: var(--brass); font-size: 17px; }
+.cash-chip strong { color: #e3c88e; font: 600 14px "Consolas",monospace; }
+.cash-chip small, .rating-chip small { color: #85949e; font: 7px "Consolas",monospace; letter-spacing: .08em; }
+.rating-chip { gap: 0; }
+.rating-chip b { color: #c4d6ad; font: 600 13px "Consolas",monospace; }
+.wallet-chip { min-height: 35px; padding: 0 10px; border: 1px solid rgba(159,180,189,.21); background: transparent; color: #c0cbd0; font-size: 10px; cursor: pointer; }
+.wallet-chip:hover { border-color: #b98f58; background: rgba(255,255,255,.03); }
+.wallet-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #8995a2; box-shadow: 0 0 0 3px rgba(137,149,162,.12); }
+.wallet-dot.connected { background: #7dcc9f; }.wallet-dot.wrong-network { background: #e6a56b; }
+.district-progress { position: absolute; top: 72px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; color: #7e8d96; }
+.district-progress > span { margin-right: 3px; font: 7px "Consolas",monospace; letter-spacing: .14em; }
+.district-progress i { width: 17px; height: 17px; display: grid; place-items: center; border: 1px solid #45535d; border-radius: 50%; color: #76858b; font: normal 7px "Consolas",monospace; }
+.district-progress i.unlocked { border-color: #9a815b; color: #d2b782; }
+.district-progress i.visited { border-color: #70997b; background: rgba(87,143,103,.14); color: #a9c8a9; }
+.district-progress small { margin-left: 6px; white-space: nowrap; font-size: 8px; }
+.save-warning { max-width: 1540px; margin: 12px auto 0; padding: 9px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(216,135,114,.5); background: rgba(130,66,54,.18); }
+.save-warning > span { color: #e6a18b; }.save-warning p { flex: 1; margin: 0; color: #e5b6a5; font-size: 10px; }
+.sim-layout { width: min(1540px,100%); margin: 35px auto 42px; padding: 0 3.2%; display: grid; grid-template-columns: minmax(210px,.78fr) minmax(470px,1.9fr) minmax(238px,.9fr); gap: 15px; align-items: start; }
+.left-column,.center-column,.right-column { min-width: 0; display: grid; gap: 13px; }
+.panel { overflow: hidden; border: 1px solid rgba(206,198,177,.13); background: linear-gradient(150deg,rgba(33,49,65,.97),rgba(24,37,50,.98)); box-shadow: var(--shadow); }
+.district-panel,.shift-card,.passenger-panel,.route-panel,.car-panel,.garage-panel,.settings-panel { padding: 15px; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panel-heading h2 { margin: 4px 0 0; font: 600 17px Georgia,"Times New Roman",serif; }
+.eyebrow { color: var(--brass); font: 8px "Consolas",monospace; letter-spacing: .15em; text-transform: uppercase; }
+.map-mark,.shift-icon,.passenger-icon,.route-compass,.car-icon,.garage-icon { color: var(--brass); font-size: 19px; }
+.district-list { display: grid; gap: 6px; margin: 14px 0 11px; }
+.district-card { width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 9px 7px; border: 1px solid transparent; background: rgba(8,15,23,.19); color: #c2cbd0; text-align: left; cursor: pointer; }
+.district-card:hover:not(:disabled) { background: rgba(214,173,112,.08); }
+.district-card.selected { border-color: rgba(214,173,112,.46); background: rgba(214,173,112,.085); }
+.district-card:disabled { cursor: not-allowed; opacity: .46; }
+.district-numeral { flex: 0 0 24px; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid rgba(190,166,123,.32); border-radius: 50%; color: #d0b17b; font: 8px "Consolas",monospace; }
+.district-copy { flex: 1; min-width: 0; }
+.district-copy b,.district-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.district-copy b { font-size: 10px; font-weight: 600; }.district-copy small { margin-top: 3px; color: #8d9ba4; font-size: 8px; }
+.district-state { color: #86949b; white-space: nowrap; font: 7px "Consolas",monospace; }
+.district-card.selected .district-state { color: #d7b97e; }
+.side-note { margin: 7px 0; color: #83929c; font-size: 8px; line-height: 1.5; }
+.dispatch-tips { display: flex; gap: 8px; margin-top: 11px; padding: 9px; border-left: 2px solid rgba(214,173,112,.54); background: rgba(214,173,112,.05); }
+.tiny-icon { color: var(--brass); }.dispatch-tips p { margin: 0; color: #9facb3; font-size: 8px; line-height: 1.45; }.dispatch-tips b { color: #d0c4ae; }
+.shift-stat,.ride-detail,.car-stat { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(203,193,166,.09); color: #9aa8ae; font-size: 9px; }
+.shift-stat b,.ride-detail b,.car-stat b { color: #e1ded1; font: 500 9px "Consolas",monospace; text-align: right; }
+.shift-stat:first-of-type { margin-top: 6px; }
+.end-shift { margin-top: 8px; }
+.text-button { padding: 5px 0; border: 0; background: none; color: #c3ad83; cursor: pointer; font-size: 8px; text-align: left; }
+.text-button:hover { color: #f0d7a4; }.text-button:disabled { opacity: .42; cursor: not-allowed; }
+.passenger-panel { border-color: rgba(214,173,112,.24); }
+.passenger-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.passenger-head h2 { margin: 4px 0 0; font: 600 18px Georgia,"Times New Roman",serif; }
+.passenger-icon { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(214,173,112,.32); border-radius: 50%; }
+.ride-destination { display: flex; align-items: center; gap: 9px; margin: 13px 0 5px; padding: 9px; border: 1px solid rgba(194,183,158,.12); background: rgba(8,15,23,.15); }
+.destination-pin { color: #d7b87e; font-size: 17px; }.ride-destination small,.ride-destination b { display: block; }
+.ride-destination small { color: #88969d; font: 7px "Consolas",monospace; letter-spacing: .1em; }
+.ride-destination b { margin-top: 3px; color: #e3dfd1; font-size: 10px; }
+.estimate { color: #d8c08f !important; }
+.passenger-note { display: flex; gap: 6px; margin: 10px 0; color: #a2afb4; font-size: 8px; line-height: 1.5; }
+.passenger-note span { color: #9dc2ad; }
+.button { min-height: 36px; padding: 0 12px; border: 1px solid transparent; border-radius: 2px; cursor: pointer; font-size: 9px; font-weight: 650; transition: .15s ease; }
+.button:disabled,button:disabled { cursor: not-allowed; opacity: .53; }
+.button-primary { background: linear-gradient(120deg,#d3a66b,#e0c18a); color: #1c2831; }
+.button-primary:hover:not(:disabled) { background: #f0d59f; transform: translateY(-1px); }
+.button-secondary { border-color: rgba(195,180,148,.33); background: rgba(255,255,255,.025); color: #e2ddcc; }
+.button-secondary:hover:not(:disabled) { border-color: var(--brass); background: rgba(214,173,112,.075); }
+.full-button { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+.full-button span { font-size: 15px; }
+.ride-action { min-height: 41px; margin-top: 5px; }
+.driving-panel { background: linear-gradient(160deg,#203246,#1a2938); }
+.drive-topline { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 15px; }
+.drive-topline h1 { margin: 4px 0 0; font: 600 21px Georgia,"Times New Roman",serif; }
+.shift-live { display: flex; align-items: center; gap: 7px; color: #a9c4aa; font: 8px "Consolas",monospace; letter-spacing: .09em; }
+.shift-live i,.weather-pill i { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: #85b48d; box-shadow: 0 0 0 3px rgba(133,180,141,.13); }
+.scene-wrap { position: relative; width: 100%; height: clamp(310px,38vw,475px); overflow: hidden; border-top: 1px solid rgba(224,217,192,.12); border-bottom: 1px solid rgba(224,217,192,.12); background: #8da49a; }
+#road-scene { display: block; width: 100%; height: 100%; }
+.scene-top-hud { position: absolute; inset: 12px 12px auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.weather-pill,.street-pill { padding: 6px 8px; border: 1px solid rgba(239,234,216,.23); background: rgba(19,31,37,.62); color: #e7e5d7; font: 7px "Consolas",monospace; letter-spacing: .04em; backdrop-filter: blur(4px); }
+.weather-pill { display: flex; align-items: center; gap: 7px; }.weather-pill i { background: #d4bd7d; }.street-pill { color: #e9dfc8; }
+.speedometer { position: absolute; bottom: 14px; left: 13px; width: 92px; padding: 9px 10px 8px; border: 1px solid rgba(242,235,215,.27); background: rgba(15,26,32,.72); box-shadow: 0 3px 15px rgba(6,12,16,.22); backdrop-filter: blur(4px); }
+.speedometer strong { color: #f2eee0; font: 600 28px "Consolas",monospace; line-height: 1; }.speedometer >span { margin-left: 4px; color: #c4cbc6; font: 7px "Consolas",monospace; }
+.speedometer small { display: block; margin-top: 4px; color: #c4b585; font: 7px "Consolas",monospace; }
+.speed-track,.mini-track { height: 3px; margin-top: 7px; overflow: hidden; background: rgba(215,217,202,.17); }
+.speed-track i,.mini-track i { display: block; height: 100%; width: 0; background: #d7ad6e; transition: width .12s linear; }
+.route-sign { position: absolute; right: 13px; bottom: 14px; display: flex; align-items: center; gap: 8px; min-width: 103px; padding: 8px 10px; border: 1px solid rgba(239,223,181,.44); background: rgba(23,37,41,.79); color: #dfc58e; box-shadow: 0 3px 14px rgba(6,12,16,.2); backdrop-filter: blur(4px); }
+.route-sign >span:first-child { font-size: 18px; }.route-sign small,.route-sign b { display: block; }
+.route-sign small { color: #b7c1bc; font: 6px "Consolas",monospace; letter-spacing: .09em; }.route-sign b { margin-top: 2px; font: 600 12px "Consolas",monospace; }
+.route-sign.target-near { border-color: #e9c27f; box-shadow: 0 0 14px rgba(224,190,126,.23); }
+.scene-message { position: absolute; top: 52px; left: 50%; max-width: min(78%,450px); transform: translateX(-50%); padding: 7px 11px; border: 1px solid rgba(232,222,193,.2); background: rgba(18,29,34,.69); color: #ede5d0; font-size: 8px; line-height: 1.4; text-align: center; backdrop-filter: blur(3px); pointer-events: none; }
+.stranded-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; background: rgba(14,24,31,.72); color: #f0e5ce; text-align: center; }
+.stranded-cover b { font: 600 22px Georgia,serif; letter-spacing: .12em; }.stranded-cover span { font-size: 10px; }.stranded-cover button { margin-top: 4px; }
+.drive-dashboard { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid rgba(203,193,166,.1); }
+.dashboard-cell { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-right: 1px solid rgba(203,193,166,.09); }
+.dashboard-cell:last-child { border: 0; }
+.dash-icon { color: #b7c5be; font-size: 17px; }.fuel-icon { color: #d6b77c; }.fare-icon { color: #d5bd85; }
+.dashboard-cell div { min-width: 0; flex: 1; }.dashboard-cell small,.dashboard-cell b,.dashboard-cell div>span { display: block; }
+.dashboard-cell small { color: #81919a; font: 7px "Consolas",monospace; letter-spacing: .11em; }
+.dashboard-cell b { overflow: hidden; margin-top: 3px; color: #e5e3d8; font: 500 10px "Consolas",monospace; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-cell div>span { margin-top: 3px; overflow: hidden; color: #91a0a5; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.mini-track { max-width: 100px; height: 2px; margin-top: 5px; }.mini-track i { background: #87b49d; }.mini-track i.low { background: #df987d; }
+.drive-controls { min-height: 61px; display: grid; grid-template-columns: 90px 1fr 170px; align-items: center; gap: 10px; padding: 8px 12px; }
+.steer-control>small { color: #89989f; font: 7px "Consolas",monospace; letter-spacing: .11em; }
+.control-buttons { display: flex; gap: 4px; margin-top: 4px; }.control-buttons button,.pedal-control button { border: 1px solid rgba(193,184,158,.3); background: rgba(255,255,255,.035); color: #e3decc; cursor: pointer; touch-action: none; user-select: none; }
+.control-buttons button { width: 35px; height: 27px; }.control-buttons button:hover,.pedal-control button:hover { border-color: var(--brass); background: rgba(214,173,112,.09); }
+.control-help { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px 12px; color: #87969e; font-size: 7px; }
+.pedal-control { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }.pedal-control button { min-width: 0; width: 100%; height: 34px; padding: 0 3px; font: 700 7px "Consolas",monospace; }.pedal-control button:last-child { border-color: rgba(160,194,163,.38); color: #b6d2b6; }.pedal-control button span { margin-left: 2px; }
+.mini-map { position: relative; height: 108px; margin-top: 12px; overflow: hidden; border: 1px solid rgba(200,192,164,.12); background: linear-gradient(140deg,#2c3d43,#233940); }
+.map-grid { position: absolute; inset: -20%; opacity: .35; background: repeating-linear-gradient(0deg,transparent 0 20px,rgba(176,189,159,.14) 21px 23px),repeating-linear-gradient(90deg,transparent 0 28px,rgba(176,189,159,.12) 29px 31px); transform: rotate(-12deg); }
+.mini-map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.map-road-outline { fill: none; stroke: rgba(179,185,158,.29); stroke-width: 15; stroke-linecap: round; }
+.map-road-center { fill: none; stroke: #d6c69d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; }
+.mini-map svg text { fill: #c7d1c5; font: 6px "Consolas",monospace; letter-spacing: .08em; }
+.map-dot-home { fill: #e3c27f; stroke: #2b3a3b; stroke-width: 2; }.map-dot-fuel { fill: #c7d2ab; stroke: #2b3a3b; stroke-width: 2; }.map-dot-target { fill: #e9f1d8; stroke: #aa7f55; stroke-width: 2; }.map-dot-target.dropoff { fill: #b9ddc0; }
+.map-road-label { position: absolute; right: 6px; bottom: 5px; color: rgba(221,226,210,.48); font: 6px "Consolas",monospace; letter-spacing: .13em; }
+.route-next { display: flex; align-items: center; gap: 8px; margin-top: 11px; padding: 9px; border: 1px solid rgba(207,190,150,.13); background: rgba(9,17,25,.15); }
+.route-next-icon { color: #d3b677; font-size: 17px; }.route-next div { flex: 1; min-width: 0; }
+.route-next small,.route-next b { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.route-next small { color: #8d9a9d; font: 6px "Consolas",monospace; letter-spacing: .09em; }.route-next b { margin-top: 3px; color: #e0dfd3; font-size: 9px; }
+.route-next strong { color: #d2bf91; white-space: nowrap; font: 10px "Consolas",monospace; }
+.route-note,.fuel-tip { margin: 8px 0 0; color: #87969d; font-size: 8px; line-height: 1.5; }
+.vehicle-illustration { height: 78px; position: relative; display: grid; place-items: center; margin: 6px auto 9px; }
+.car-shadow { position: absolute; top: 49px; width: 114px; height: 12px; border-radius: 50%; background: rgba(2,9,13,.4); filter: blur(4px); }
+.car-body { width: 87px; height: 41px; position: relative; margin-top: 4px; border: 1px solid #d5b779; border-radius: 12px 12px 8px 8px; background: linear-gradient(110deg,#b38e55,#d9bc7a 48%,#ac844d); transform: perspective(130px) rotateX(-8deg); box-shadow: inset 0 -7px rgba(91,66,39,.2),0 0 16px rgba(210,179,119,.12); }
+.car-body::before { content:""; position:absolute; top:-11px; left:20px; width:46px; height:17px; border:1px solid #88794e; border-radius: 9px 9px 3px 3px; background: linear-gradient(135deg,#405660,#223740); }
+.car-body::after { content:""; position:absolute; bottom:-2px; left:-6px; width:11px; height:21px; border-radius:4px; background:#1b2225; box-shadow: 79px 0 #1b2225; }
+.car-body i { position:absolute; z-index:1; top:2px; left:35px; width:16px; height:6px; background:#e9dfb4; }.car-body b { position:absolute; z-index:1; right:-1px; bottom:9px; width:5px; height:9px; background:#d98268; }.car-body em { position:absolute; z-index:1; left:-1px; bottom:9px; width:5px; height:9px; background:#d98268; }
+.vehicle-plate { position:absolute; top:64px; color:#89969c; font:6px "Consolas",monospace; letter-spacing:.14em; }
+.car-stat { padding: 7px 0; }.car-stat b small { color:#89979e; font-size:7px; }
+.service-action { width:100%; min-height:31px; margin-top:8px; font-size:8px; }
+.garage-list { display: grid; gap: 7px; margin-top: 11px; }
+.garage-item { padding: 8px; border: 1px solid rgba(199,189,161,.12); background: rgba(7,15,23,.15); }
+.garage-item.owned { border-color: rgba(118,174,128,.29); }
+.garage-item-head { display:flex;justify-content:space-between;gap:6px; }.garage-item-head b { color:#deded3;font-size:8px; }.garage-item-head span { color:#d5b67b;white-space:nowrap;font:7px "Consolas",monospace; }.garage-item.owned .garage-item-head span { color:#a0c09b; }
+.garage-item p { min-height:21px;margin:5px 0;color:#8f9ca1;font-size:7px;line-height:1.4; }
+.upgrade-button { min-height:23px;padding:0 7px;border:1px solid rgba(198,180,141,.28);background:rgba(255,255,255,.02);color:#cdb889;cursor:pointer;font-size:7px; }
+.upgrade-button:hover:not(:disabled) { border-color:#c49e63; }.upgrade-button:disabled { color:#78858d; }
+.setting-row { display:flex;align-items:center;justify-content:space-between;position:relative;gap:10px;padding:9px 0;border-bottom:1px solid rgba(203,193,166,.09);cursor:pointer; }
+.setting-row b,.setting-row small { display:block; }.setting-row b { color:#d9ded8;font-size:8px; }.setting-row small { margin-top:3px;color:#85949b;font-size:7px; }
+.setting-row input { position:absolute;right:0;width:31px;height:17px;opacity:0;cursor:pointer; }.toggle { width:29px;height:16px;position:relative;border:1px solid #596875;border-radius:10px;background:#2c3a45;transition:.18s ease; }
+.toggle::after { content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#a4afbb;transition:.18s ease; }.setting-row input:checked + .toggle { border-color:#73ad9d;background:rgba(87,153,132,.4); }.setting-row input:checked + .toggle::after { left:15px;background:#b0e0cb; }
+.setting-row input:focus-visible + .toggle { outline:2px solid #f1cf91;outline-offset:3px; }
+.backup-actions { display:flex;justify-content:space-between;gap:8px;margin-top:8px; }.backup-actions .text-button { font-size:7px; }.save-note { margin:7px 0 0;color:#7a8992;font-size:7px;line-height:1.5; }
+.footer { max-width:1540px;margin:auto;padding:0 3.2% 20px;display:flex;align-items:center;gap:17px;color:#697982;font:7px "Consolas",monospace;letter-spacing:.06em; }.footer a { margin-left:auto;color:#b29a6f;text-decoration:none; }.footer a:hover { color:#e4c68e; }
+.wallet-drawer { position:fixed;z-index:10;top:83px;right:max(3.2%,calc((100vw - 1540px)/2 + 3.2%));width:min(410px,calc(100vw - 24px));padding:19px;box-shadow:0 20px 70px rgba(0,0,0,.62); }.wallet-drawer[hidden] { display:none; }
+.icon-button { width:30px;height:30px;border:1px solid rgba(206,193,166,.19);background:transparent;color:var(--muted);cursor:pointer;font-size:20px; }
+.wallet-description { color:#a9b5c0;font-size:10px;line-height:1.6; }.wallet-state-card { display:flex;gap:10px;padding:11px;border:1px solid rgba(200,190,165,.16);background:rgba(0,0,0,.12); }
+.wallet-state-card .wallet-dot { margin:5px 0 0;flex:0 0 auto; }.wallet-state-card b { color:#e1d7c6;font-size:10px; }.wallet-state-card p { margin:4px 0 0;color:#95a4b4;font-size:9px;line-height:1.45; }
+.wallet-actions { display:flex;flex-wrap:wrap;gap:8px;margin:12px 0; }.wallet-actions .button { min-height:34px;font-size:9px; }.keepsake-card { display:flex;gap:10px;padding:12px 0;border-top:1px solid rgba(206,193,166,.12);border-bottom:1px solid rgba(206,193,166,.12); }
+.keepsake-seal { width:33px;height:33px;flex:0 0 auto;display:grid;place-items:center;border:1px solid rgba(215,170,105,.4);border-radius:50%;color:#e4c68e; }.keepsake-card b { color:#e0d1b3;font:500 14px Georgia,serif; }
+.keepsake-card p { margin:5px 0;color:#9eabb8;font-size:9px;line-height:1.5; }.keepsake-card small { color:#aa8d63;font:8px "Consolas",monospace; }
+.explorer-link { display:inline-block;margin-top:10px;color:#9ebdc1;font-size:9px; }.wallet-safety { margin:12px 0 0;color:#7d8c9b;font-size:8px; }
+.toast-region { position:fixed;z-index:11;right:18px;bottom:18px;max-width:360px;padding:11px 15px;border:1px solid rgba(215,170,105,.4);background:#1d2b3c;color:#e2d5bb;box-shadow:var(--shadow);font-size:10px;opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s ease; }.toast-region.visible { opacity:1;transform:translateY(0); }
+.reduced-motion *, .reduced-motion *::before { animation-duration:.01ms!important;transition-duration:.01ms!important; }
+@media(max-width:1190px) {
+  .district-progress { display:none; }
+  .sim-layout { grid-template-columns:minmax(210px,.77fr) minmax(440px,1.45fr); }
+  .right-column { grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start; }
+  .settings-panel { grid-column:1/-1; }
+}
+@media(max-width:760px) {
+  .topbar { min-height:64px;padding:8px 13px;gap:7px; }
+  .brand { gap:7px; }.brand-mark { width:31px;height:31px;font-size:20px; }.brand strong { font-size:10px; }.brand small { font-size:6px; }
+  .topbar-status { gap:5px; }.cash-chip,.rating-chip { min-height:33px;padding:3px 7px;column-gap:5px; }.cash-chip strong,.rating-chip b { font-size:10px; }.cash-chip small,.rating-chip small { font-size:6px; }
+  .wallet-chip { min-height:30px;padding:0 6px;font-size:0; }.wallet-dot { margin:0; }
+  .sim-layout { display:flex;flex-direction:column;gap:10px;margin:14px auto 28px;padding:0 10px; }
+  .left-column,.center-column,.right-column { width:100%; }.center-column { order:0; }.left-column { order:1; }.right-column { order:2;grid-template-columns:1fr; }
+  .scene-wrap { height:clamp(280px,67vw,425px); }.drive-topline { min-height:54px;padding:9px 11px; }.drive-topline h1 { font-size:18px; }
+  .shift-live { font-size:7px; }.drive-dashboard { grid-template-columns:repeat(3,minmax(0,1fr)); }.dashboard-cell { gap:5px;padding:8px 6px; }.dashboard-cell b { font-size:8px; }.dashboard-cell small { font-size:6px; }.dashboard-cell div>span { font-size:6px; }.dash-icon { font-size:13px; }
+  .drive-controls { grid-template-columns:74px 1fr 126px;gap:5px;padding:7px; }.control-help { gap:4px 7px;font-size:6px; }.pedal-control button { min-width:0;height:31px;font-size:6px; }
+  .left-column { display:flex;flex-direction:column; }.passenger-panel { order:0; }.district-panel { order:1; }.shift-card { order:2; }
+  .district-list { grid-template-columns:repeat(2,minmax(0,1fr)); }.district-card { padding:7px 5px;gap:5px; }.district-numeral { flex-basis:20px;width:20px;height:20px;font-size:7px; }.district-copy b { font-size:8px; }.district-copy small { font-size:7px; }.district-state { font-size:6px; }
+  .panel { border-radius:2px; }.district-panel,.shift-card,.passenger-panel,.route-panel,.car-panel,.garage-panel,.settings-panel { padding:12px; }
+  .right-column { gap:10px; }.footer { flex-wrap:wrap;gap:8px 12px;padding:0 12px 15px;font-size:6px; }.footer a { width:100%;margin-left:0; }
+  .wallet-drawer { top:70px;right:8px; }
+}
+@media(max-width:390px) {
+  .brand small { letter-spacing:.06em; }.rating-chip { display:none; }.drive-controls { grid-template-columns:67px 1fr 102px; }.control-help { flex-direction:column;gap:2px; }
+  .speedometer { left:8px;bottom:9px;width:79px;padding:7px; }.speedometer strong { font-size:23px; }.route-sign { right:8px;bottom:9px;min-width:88px;padding:6px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important; }
+}
+.coin-chip > span,.coin-chip strong { color:#f0ca70; }
+.onchain-board { margin:13px 0;padding:11px;border:1px solid rgba(214,173,112,.24);background:rgba(8,15,23,.18); }
+.leaderboard-heading { display:flex;align-items:center;justify-content:space-between;gap:8px;color:#d9bd82;font:8px "Consolas",monospace;letter-spacing:.08em; }
+.leaderboard-row { display:grid;grid-template-columns:20px minmax(72px,.8fr) minmax(110px,1fr);align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid rgba(203,193,166,.08);font-size:8px; }
+.leaderboard-row>span { color:#d5b97f;font:9px "Consolas",monospace; }
+.leaderboard-row>b { color:#e4e0d1;font:9px "Consolas",monospace; }
+.leaderboard-row>small { color:#aab5b8;font-size:8px;text-align:right; }
+.leaderboard-empty,.leaderboard-status { color:#89979e;font-size:8px;line-height:1.5; }
+.publish-progress { width:100%;margin-top:7px;font-size:9px; }
+.publish-confirm { margin-top:8px;padding:9px;border:1px solid rgba(214,173,112,.25);background:rgba(214,173,112,.06); }
+.publish-confirm p { color:#c2c9c4;font-size:8px;line-height:1.55; }
+.publish-confirm p b { color:#f0cf87; }
+.publish-confirm .text-button { margin-left:9px; }
+.stage-objective { margin:12px 0 8px;padding:10px;border:1px solid rgba(214,173,112,.2);background:rgba(8,15,23,.18); }
+.objective-heading,.objective-row { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.objective-heading { margin-bottom:7px;color:#d9bd82;font:8px "Consolas",monospace;letter-spacing:.08em; }
+.objective-heading span { color:#9dc2ad; }
+.objective-row { padding:5px 0;border-top:1px solid rgba(203,193,166,.08);color:#aab5b8;font-size:8px; }
+.objective-row b { color:#e4d7b6;font:9px "Consolas",monospace; }
+.stage-objective>small { display:block;margin-top:7px;color:#86969d;font-size:7px;line-height:1.45; }
+.legend-coin { color:#f0ca70; }
+.topbar { position:relative; }
+.city-progress { display:flex;align-items:center;gap:7px;color:#81919a;white-space:nowrap; }
+.city-progress>span { margin-right:2px;font:7px "Consolas",monospace;letter-spacing:.13em; }
+.city-progress i { width:17px;height:17px;display:grid;place-items:center;border:1px solid #45535d;border-radius:50%;color:#76858b;font:normal 7px "Consolas",monospace; }
+.city-progress i.unlocked { border-color:#9a815b;color:#d2b782; }
+.city-progress i.visited { border-color:#70997b;background:rgba(87,143,103,.14);color:#a9c8a9; }
+.city-progress small { margin-left:3px;color:#87959c;font-size:8px; }
+.trip-panel,.map-legend-panel { padding:15px; }
+.trip-panel .panel-heading h2,.map-legend-panel .panel-heading h2 { margin:4px 0 0;font:600 17px Georgia,"Times New Roman",serif; }
+.trip-destination { display:flex;align-items:center;gap:9px;margin:12px 0 6px;padding:9px;border:1px solid rgba(194,183,158,.12);background:rgba(8,15,23,.15); }
+.trip-destination small,.trip-destination b { display:block; }
+.trip-destination small { color:#88969d;font:7px "Consolas",monospace;letter-spacing:.1em; }
+.trip-destination b { margin-top:3px;color:#e3dfd1;font-size:10px; }
+.trip-stats { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:9px 0; }
+.trip-stats>span { display:grid;gap:3px;padding:7px;border:1px solid rgba(203,193,166,.09);background:rgba(8,15,23,.12); }
+.trip-stats small { color:#84939c;font:7px "Consolas",monospace; }
+.trip-stats b { color:#e1ded1;font:500 9px "Consolas",monospace; }
+.waiting-list { display:grid;gap:5px;max-height:174px;overflow:auto;margin:8px 0; }
+.waiting-person { width:100%;display:flex;align-items:center;gap:7px;padding:7px;border:1px solid rgba(193,184,158,.14);background:rgba(8,15,23,.18);text-align:left;cursor:pointer; }
+.waiting-person:hover:not(:disabled),.waiting-person.selected { border-color:rgba(214,173,112,.53);background:rgba(214,173,112,.09); }
+.waiting-person:disabled { cursor:not-allowed;opacity:.62; }
+.person-avatar { flex:0 0 25px;width:25px;height:25px;display:grid;place-items:center;border:1px solid rgba(157,194,173,.35);border-radius:50%;color:#acd0b5;font-size:14px; }
+.person-details { flex:1;min-width:0; }
+.person-details b,.person-details small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.person-details b { color:#e1dfd3;font-size:9px; }.person-details small { margin-top:2px;color:#89979e;font-size:7px; }
+.person-distance { color:#d5c18f;font:8px "Consolas",monospace; }
+.passenger-note { display:block;margin:8px 0 10px;color:#a2afb4;font-size:8px;line-height:1.5; }
+.passenger-note span { color:#9dc2ad; }
+.map-mark,.shift-icon,.passenger-icon,.route-compass,.car-icon,.garage-icon { color:var(--brass);font-size:19px; }
+.scene-hud { position:absolute;z-index:1;top:11px;left:11px;display:flex;gap:6px;pointer-events:none; }
+.weather-pill,.street-pill { padding:6px 8px;border:1px solid rgba(239,234,216,.23);background:rgba(19,31,37,.68);color:#e7e5d7;font:7px "Consolas",monospace;letter-spacing:.04em;backdrop-filter:blur(4px); }
+.weather-pill { display:flex;align-items:center;gap:7px; }.weather-pill i { width:6px;height:6px;display:inline-block;border-radius:50%;background:#d4bd7d; }
+.map-target-chip { position:absolute;top:11px;right:11px;display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid rgba(239,223,181,.44);background:rgba(23,37,41,.82);color:#dfc58e;pointer-events:none; }
+.map-target-chip>span:first-child { font-size:17px; }.map-target-chip small,.map-target-chip b { display:block; }
+.map-target-chip small { color:#b7c1bc;font:6px "Consolas",monospace;letter-spacing:.08em; }.map-target-chip b { margin-top:2px;font:600 11px "Consolas",monospace; }
+.map-legend-panel { display:grid;gap:9px; }
+.legend-row { display:flex;align-items:center;gap:9px;padding-bottom:7px;border-bottom:1px solid rgba(203,193,166,.09); }
+.legend-row>i { flex:0 0 27px;width:27px;height:27px;display:grid;place-items:center;border:1px solid rgba(193,184,158,.18);border-radius:50%;font-style:normal; }
+.legend-taxi { color:#dfbb7d; }.legend-rider { color:#a8d1b3; }.legend-route { color:#e3c781; }.legend-fuel { color:#d8e0bb; }
+.legend-barrier { color:#f0c873;background:repeating-linear-gradient(135deg,rgba(240,200,115,.25) 0 3px,transparent 3px 6px); }
+.trip-stats #fare-deadline { color:#c8d8ae; }
+.trip-stats #fare-deadline.urgent { color:#f1bf75; }
+.trip-stats #fare-deadline.late { color:#e8957d; }
+.legend-row b,.legend-row small { display:block; }.legend-row b { color:#e0ddd1;font-size:9px; }.legend-row small { margin-top:2px;color:#89979e;font-size:7px; }
+.map-note { padding:8px;border-left:2px solid rgba(214,173,112,.45);background:rgba(214,173,112,.05);color:#98a6ac;font-size:8px;line-height:1.5; }
+@media(max-width:1190px) {
+  .city-progress { display:none; }
+}
+@media(max-width:760px) {
+  .trip-panel,.map-legend-panel { padding:12px; }
+  .map-target-chip { top:auto;right:8px;bottom:59px; }
+  .scene-hud { top:8px;left:8px; }
+  .weather-pill,.street-pill { padding:5px 6px;font-size:6px; }
+}

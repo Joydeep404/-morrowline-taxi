@@ -1,0 +1,21 @@
+{
+  "name": "morrowline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A neighborhood taxi-driving game with passenger fares and city traffic",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "start": "node scripts/server.mjs --dist",
+    "build": "node scripts/build.mjs",
+    "compile:contracts": "node scripts/compile-contracts.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "devDependencies": {
+    "solc": "0.8.38"
+  },
+  "overrides": {
+    "tmp": "0.2.7"
+  }
+}
