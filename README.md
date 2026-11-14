@@ -64,4 +64,4 @@ The app is built from native JavaScript modules, HTML, and CSS. There are no thi
 
 ## Hosting status
 
-`render.yaml` contains static-site build settings, but this workspace has not been published and has no shareable public URL. A public web host is separate from Sepolia: a Sepolia contract does not host the game website. No leaderboard contract is deployed or connected.
+The GitHub Actions workflow in `.github/workflows/pages.yml` builds and publishes the game to GitHub Pages whenever `main` is updated. The site is separate from Sepolia: a Sepolia contract does not host the game website. No leaderboard contract is deployed or connected.
