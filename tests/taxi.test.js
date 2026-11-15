@@ -350,6 +350,29 @@ test("taxi v2 saves migrate using the preserved legacy key", () => {
   assert.equal(availableDistricts(profile).length, 2);
 });
 
+test("a broken current save falls back to the latest valid legacy backup", () => {
+  const previous = {
+    ...newProfile(),
+    version: 4,
+    coins: 11,
+    cashCents: 9600,
+    stageProgress: {
+      ...newProfile().stageProgress,
+      "old-town": { fares: 1, onTimeFares: 1, coins: 3 }
+    }
+  };
+  const storage = memoryStorage([
+    [SAVE_KEY, JSON.stringify({ ...newProfile(), version: 999 })],
+    [LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]
+  ]);
+  const profile = loadProfile(storage);
+  assert.equal(profile.version, 5);
+  assert.equal(profile.coins, 11);
+  assert.equal(profile.cashCents, 9600);
+  assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 3 });
+  assert.equal(storage.stored.has(SAVE_KEY), true);
+});
+
 test("taxi v4 saves migrate without losing coins or neighborhood objective progress", () => {
   const previous = {
     ...newProfile(),

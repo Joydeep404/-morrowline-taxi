@@ -120,25 +120,32 @@ function migrateTaxiSave(storage, key, version) {
   return migrated;
 }
 
+function loadLegacyProfile(storage) {
+  const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
+    migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
+    migrateTaxiSave(storage, LEGACY_TAXI_V2_SAVE_KEY, 2) ??
+    migrateCourierSave(storage);
+  if (migrated) {
+    saveProfile(migrated, storage);
+    return migrated;
+  }
+  return null;
+}
+
 export function loadProfile(storage = globalThis.localStorage) {
   const raw = storage?.getItem(SAVE_KEY);
   if (raw) {
     try {
       return validateProfile(JSON.parse(raw));
     } catch (error) {
+      const migrated = storage ? loadLegacyProfile(storage) : null;
+      if (migrated) return migrated;
       if (error instanceof SyntaxError) throw new Error("Your taxi save is damaged. Restore a backup or keep the current file before starting fresh.");
       throw error;
     }
   }
   if (storage) {
-    const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
-      migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
-      migrateTaxiSave(storage, LEGACY_TAXI_V2_SAVE_KEY, 2) ??
-      migrateCourierSave(storage);
-    if (migrated) {
-      saveProfile(migrated, storage);
-      return migrated;
-    }
+    return loadLegacyProfile(storage) ?? newProfile();
   }
   return newProfile();
 }
