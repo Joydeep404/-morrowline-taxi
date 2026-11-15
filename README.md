@@ -31,8 +31,10 @@ npm start
 - Steer with **A/D**, **←/→**, or the on-screen steer controls. Hold the on-screen gas, brake, and reverse pedals on touch devices.
 - Each neighborhood has a different deadline, traffic load, and number of roadwork barriers. Steer around the striped barriers; collisions damage the taxi and hurt your rating.
 - Each stage has its own checklist: finish fares, meet on-time targets, and collect glowing coins from the streets. Completing the checklist unlocks the next neighborhood.
+- A first-shift tutorial explains passenger pickups, driving controls, objectives, fuel, and repairs. Reopen it any time with **Instructions**.
 - On-time fares earn 2 Morrow coins. Drive over the gold coin markers to collect more; spend coins on garage upgrades.
 - The displayed street speed limit, smooth braking, and collision-free driving affect passenger ratings and tips.
+- Collisions and off-road driving damage the taxi. Damage reduces acceleration, top speed, and handling; at 100% damage the taxi stops until fully repaired. A full repair costs $110. If remaining cash is below the repair cost, the current district restarts with a repaired car and its objective progress reset; cash, upgrades, and other districts' progress are kept.
 - Fuel is consumed as you drive. Stop near a marked service station and use **F** or **Refuel**. If the tank runs dry, roadside assistance offers a low-cost 5-litre top-up; the charge never exceeds your current balance.
 - Fares are repeatable. A new neighborhood opens after each completed ride, so you can keep earning without a wallet, purchases, ads, or external services.
 
@@ -42,11 +44,11 @@ The map is a custom Canvas illustration with streets, crossings, houses, parks, 
 
 Old Town opens first, followed by Maple Heights, Riverside, Market District, and Airport Road when the previous stage's fare, on-time, and coin checklist is complete. Each stage adds traffic and roadworks while narrowing the deadline cushion. Neighborhoods also set their own speed limits, fare rates, and route lengths.
 
-The starting Morrowline S4 comes with a full 48 L tank and $400 in shift funds. Earnings and Morrow coins persist locally between sessions. A fare adds base pay, a distance component, and possible service/comfort tips. Fuel costs $1.85/L; the starter car consumes more fuel than an Economy Tune, and the Long-Range Tank adds 20 L. The Performance Engine raises acceleration and top speed from 55 to 78 km/h. Other upgrades include All-Weather Tyres and Comfort Cabin. Garage purchases use Morrow coins, show their cost and effect before confirmation, and cannot overdraw the coin balance.
+The starting Morrowline S4 comes with a full 48 L tank and $400 in shift funds. Earnings and Morrow coins persist locally between sessions. A fare adds base pay, a distance component, and possible service/comfort tips. Fuel costs $1.85/L; the starter car consumes more fuel than an Economy Tune, and the Long-Range Tank adds 20 L. The starter taxi tops out at 61 km/h; the Performance Engine raises that to 82 km/h. Other upgrades include All-Weather Tyres and Comfort Cabin. Garage purchases use Morrow coins, show their cost and effect before confirmation, and cannot overdraw the coin balance.
 
 ## Save files
 
-Cash, Morrow coins, ride history, driver rating, stage objectives, installed equipment, and preferences are stored in this browser. Previous taxi saves and the earlier courier-game save are automatically migrated, retaining compatible progress and preferences; previously earned fares preserve equivalent stage unlocks. Older saves are left untouched. Export a JSON backup in Settings to move progress; Restore Save validates the backup before loading. Browser local storage is not a cloud backup.
+Cash, Morrow coins, ride history, driver rating, stage objectives, installed equipment, and preferences are stored in this browser. Previous taxi saves and the earlier courier-game save are automatically migrated, retaining compatible progress and preferences; previously earned fares preserve equivalent stage unlocks. Older saves are left untouched. Export a JSON backup in Settings to move progress; Restore Save validates the backup before loading. Browser local storage is not a cloud backup. The first-play tutorial dismissal is remembered separately in this browser.
 
 ## Optional Sepolia leaderboard
 
@@ -54,7 +56,7 @@ The game itself is a static website; Sepolia cannot host the web app. MetaMask i
 
 ## Test and build
 
-- `npm test` — gameplay, stage objective gates, upgrade-driven performance, coin collection, save migration, wallet-state checks, and leaderboard Solidity/ABI behavior.
+- `npm test` — gameplay, stage objective gates, upgrade- and damage-driven vehicle performance, repair/restart recovery, coin collection, save migration, wallet-state checks, and leaderboard Solidity/ABI behavior.
 - `npm run build` — writes the static application to `dist/`.
 - `npm run compile:contracts` — compiles the optional Solidity leaderboard for Sepolia deployment.
 - `npm run dev` — local development server.

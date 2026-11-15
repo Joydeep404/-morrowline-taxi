@@ -4,10 +4,10 @@ import { DISTRICTS, GARAGE_ITEMS } from "../src/districts.js";
 import {
   acceptRide, advanceShift, availableDistricts, createShift, dropOffPassenger,
   formatMoney, getCarStats, isParkedAtObjective, newProfile, nextFuelStation, purchaseGarageItem,
-  rateRide, refuel, roadsideAssistance, takePassenger
+  rateRide, refuel, repairCar, roadsideAssistance, takePassenger
 } from "../src/game.js";
 import {
-  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, loadProfile,
+  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, LEGACY_TAXI_V4_SAVE_KEY, loadProfile,
   SAVE_KEY, saveProfile, validateProfile
 } from "../src/save.js";
 import { getMapTransform } from "../src/renderer.js";
@@ -140,16 +140,79 @@ test("driving over map coins awards persistent coins and stage objective progres
 
 test("engine, fuel economy, and tank upgrades change measurable vehicle performance", () => {
   const profile = newProfile();
-  assert.equal(getCarStats(profile).maxSpeed, 55);
+  assert.equal(getCarStats(profile).maxSpeed, 61);
   assert.equal(getCarStats(profile).maxFuel, 48);
+  assert.equal(getCarStats(profile, 0).acceleration, 13);
+  assert.ok(getCarStats(profile, 50).maxSpeed < getCarStats(profile).maxSpeed);
+  assert.ok(getCarStats(profile, 50).acceleration < getCarStats(profile).acceleration);
   const engine = purchaseGarageItem({ ...profile, coins: 12 }, "engine-tune");
   assert.equal(engine.ok, true);
-  assert.equal(getCarStats(engine.profile).maxSpeed, 78);
+  assert.equal(getCarStats(engine.profile).maxSpeed, 82);
   assert.ok(getCarStats(engine.profile).acceleration > getCarStats(profile).acceleration);
   const economy = purchaseGarageItem({ ...profile, coins: 8 }, "eco-tune");
   assert.ok(getCarStats(economy.profile).fuelUsePerMeter < getCarStats(profile).fuelUsePerMeter);
   const tank = purchaseGarageItem({ ...profile, coins: 14 }, "long-range-tank");
   assert.equal(getCarStats(tank.profile).maxFuel, 68);
+});
+
+test("a fully damaged taxi is immobilized until repaired, cancelling any active fare", () => {
+  const profile = newProfile();
+  const initial = createShift(profile, DISTRICTS[0].id, constantRandom(.5));
+  const disabled = {
+    ...initial,
+    status: "disabled",
+    damage: 100,
+    speed: 0,
+    passenger: { id: initial.passengers[0].id, name: "Riley", destination: "the clinic" },
+    trip: { status: "to-dropoff", deadlineSeconds: 30 }
+  };
+  assert.equal(advanceShift(disabled, { accelerate: true }, .06, profile).shift, disabled);
+  const result = repairCar(disabled, profile);
+  assert.equal(result.ok, true);
+  assert.equal(result.shift.damage, 0);
+  assert.equal(result.shift.status, "driving");
+  assert.equal(result.shift.trip, null);
+  assert.equal(result.profile.cashCents, profile.cashCents - 11_000);
+});
+
+test("unaffordable full damage restarts the current district and resets only its task progress", () => {
+  const base = newProfile();
+  const profile = {
+    ...base,
+    cashCents: 500,
+    coins: 7,
+    stageProgress: {
+      ...base.stageProgress,
+      "old-town": { fares: 1, onTimeFares: 1, coins: 2 },
+      "maple-heights": { fares: 1, onTimeFares: 0, coins: 1 }
+    }
+  };
+  const created = createShift(profile, DISTRICTS[0].id, constantRandom(.5));
+  const barrier = created.roadworks[0];
+  let shift = {
+    ...created,
+    status: "driving",
+    damage: 99,
+    x: barrier.x,
+    y: barrier.y - 20,
+    heading: Math.PI / 2,
+    speed: 50,
+    traffic: [],
+    coins: []
+  };
+  let result;
+  for (let frame = 0; frame < 60; frame += 1) {
+    result = advanceShift(shift, { accelerate: true }, .06, profile);
+    shift = result.shift;
+    if (result.restarted) break;
+  }
+  assert.equal(result.restarted, true);
+  assert.equal(shift.status, "idle");
+  assert.equal(shift.damage, 0);
+  assert.equal(result.profile.cashCents, 500);
+  assert.equal(result.profile.coins, 7);
+  assert.deepEqual(result.profile.stageProgress["old-town"], { fares: 0, onTimeFares: 0, coins: 0 });
+  assert.deepEqual(result.profile.stageProgress["maple-heights"], { fares: 1, onTimeFares: 0, coins: 1 });
 });
 
 test("driving controls move the taxi, consume fuel, and apply braking and rating penalties", () => {
@@ -272,7 +335,7 @@ test("taxi v3 saves migrate progress and settings without removing the source ba
   assert.equal(profile.rides, 2);
   assert.deepEqual(profile.upgrades, ["eco-tune"]);
   assert.equal(profile.settings.sound, true);
-  assert.equal(profile.version, 4);
+  assert.equal(profile.version, 5);
   assert.equal(availableDistricts(profile).length, 3);
   assert.equal(storage.stored.has(LEGACY_TAXI_SAVE_KEY), true);
   assert.equal(storage.stored.has(SAVE_KEY), true);
@@ -282,9 +345,29 @@ test("taxi v2 saves migrate using the preserved legacy key", () => {
   const previous = { ...newProfile(), version: 2, cashCents: 5000, rides: 1 };
   const storage = memoryStorage([[LEGACY_TAXI_V2_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 4);
+  assert.equal(profile.version, 5);
   assert.equal(profile.cashCents, 5000);
   assert.equal(availableDistricts(profile).length, 2);
+});
+
+test("taxi v4 saves migrate without losing coins or neighborhood objective progress", () => {
+  const previous = {
+    ...newProfile(),
+    version: 4,
+    coins: 17,
+    cashCents: 12800,
+    stageProgress: {
+      ...newProfile().stageProgress,
+      "old-town": { fares: 1, onTimeFares: 1, coins: 2 }
+    }
+  };
+  const storage = memoryStorage([[LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]]);
+  const profile = loadProfile(storage);
+  assert.equal(profile.version, 5);
+  assert.equal(profile.coins, 17);
+  assert.equal(profile.cashCents, 12800);
+  assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 2 });
+  assert.equal(storage.stored.has(LEGACY_TAXI_V4_SAVE_KEY), true);
 });
 
 test("old courier saves migrate credits and settings without losing the source backup", () => {

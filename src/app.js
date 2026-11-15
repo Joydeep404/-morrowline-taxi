@@ -2,7 +2,7 @@ import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import {
   acceptRide, advanceShift, availableDistricts, canParkAt, CITY, createShift,
   distanceTo, dropOffPassenger, findPassenger, formatMoney, getCarStats, getDistrict,
-  getStageProgress, isOnRoad, isStageComplete, newProfile, nextFuelStation, purchaseGarageItem, refuel, repairCar,
+  getStageProgress, isOnRoad, isStageComplete, newProfile, nextFuelStation, purchaseGarageItem, REPAIR_CENTS_PER_DAMAGE, refuel, repairCar,
   roadsideAssistance, takePassenger
 } from "./game.js";
 import { exportSave, importSave, loadProfile, saveProfile } from "./save.js";
@@ -24,11 +24,20 @@ let leaderboardMessage = "";
 let pendingProgress = null;
 let leaderboardLoading = false;
 let saveWarning = "";
+let tutorialOpen = false;
 let toastTimer;
 let eventSound = null;
 let lastFrame = 0;
 let lastHudUpdate = 0;
 const heldControls = new Set();
+const TUTORIAL_SEEN_KEY = "morrowline.tutorial-seen.v1";
+
+try {
+  tutorialOpen = localStorage.getItem(TUTORIAL_SEEN_KEY) !== "true";
+} catch (error) {
+  saveWarning = `Tutorial preference could not be read: ${error.message}`;
+  tutorialOpen = true;
+}
 
 try {
   profile = loadProfile();
@@ -96,10 +105,12 @@ function formatDeadline(seconds) {
 }
 
 function canChangeDistrict() {
-  return shift.trip?.status !== "to-pickup" && shift.trip?.status !== "to-dropoff";
+  return shift.status !== "disabled" && shift.damage < 100 &&
+    shift.trip?.status !== "to-pickup" && shift.trip?.status !== "to-dropoff";
 }
 
 function getActionText() {
+  if (shift.status === "disabled") return "Repair taxi to continue";
   if (shift.stranded) return "Call roadside assistance";
   if (shift.trip?.status === "to-pickup") {
     const gap = distanceTo(shift, shift.trip.pickupAt);
@@ -133,6 +144,7 @@ function renderHeader() {
       <span class="cash-chip" aria-label="Taxi earnings ${formatMoney(profile.cashCents)}"><span>＄</span><strong>${formatMoney(profile.cashCents)}</strong><small>DRIVER EARNINGS</small></span>
       <span class="cash-chip coin-chip" aria-label="${profile.coins} Morrow coins"><span>✦</span><strong id="coin-count">${profile.coins}</strong><small>MORROW COINS</small></span>
       <span class="rating-chip"><b>★ ${profile.reputation.toFixed(1)}</b><small>DRIVER RATING</small></span>
+      <button class="instructions-button" id="instructions-button" data-action="tutorial-open">Instructions</button>
       <button class="wallet-chip" data-action="wallet-open" aria-label="Open optional Sepolia wallet panel"><span class="wallet-dot ${wallet.state}"></span>${walletLabel}</button>
     </div>
     <div class="city-progress" aria-label="Neighborhoods unlocked"><span>NEIGHBORHOODS</span>${DISTRICTS.map((district, index) => {
@@ -140,6 +152,23 @@ function renderHeader() {
       return `<i title="${escapeText(district.name)}" class="${unlocked ? "unlocked" : ""} ${profile.districtsVisited.includes(district.id) ? "visited" : ""}">${profile.districtsVisited.includes(district.id) ? "✓" : index + 1}</i>`;
     }).join("")}<small>${profile.districtsVisited.length}/${DISTRICTS.length} explored · ${profile.rides} fares</small></div>
   </header>`;
+}
+
+function renderTutorial() {
+  if (!tutorialOpen) return "";
+  return `<div class="tutorial-backdrop" data-action="tutorial-backdrop">
+    <section class="tutorial-dialog" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" tabindex="-1">
+      <div class="panel-heading"><div><span class="eyebrow">QUICK DRIVER BRIEFING</span><h2 id="tutorial-title">Your first taxi shift</h2></div><button class="icon-button" data-action="tutorial-close" aria-label="Close instructions">×</button></div>
+      <ol class="tutorial-steps">
+        <li><b>Choose a rider.</b><span>Click a person on the city map or select a name in Available Riders, then accept the pickup.</span></li>
+        <li><b>Pick up and drop off.</b><span>Follow the gold route to the curb. Stop within 48 m and press Space. Follow the green route, park near the destination, and press Space again.</span></li>
+        <li><b>Drive carefully.</b><span>W / ↑ accelerates, S / ↓ brakes, A/D or ←/→ steers, and R reverses. Avoid traffic, barriers, and grass.</span></li>
+        <li><b>Complete each neighborhood task.</b><span>Finish fares, deliver on time, and drive over glowing coins to unlock the next stage and buy upgrades.</span></li>
+        <li><b>Look after your taxi.</b><span>Refuel at an F station. Damage reduces speed and handling; at 100% the taxi stops until repaired. If you cannot afford a full repair, the current district restarts and its task progress resets, but your remaining cash and upgrades stay.</span></li>
+      </ol>
+      <button class="button button-primary full-button" data-action="tutorial-close">Got it — start driving</button>
+    </section>
+  </div>`;
 }
 
 function renderTripPanel() {
@@ -162,7 +191,7 @@ function renderTripPanel() {
         <span class="person-avatar" aria-hidden="true">♟</span><span class="person-details"><b>${escapeText(rider.name)}</b><small>Waiting · ${escapeText(streetNameFor(rider))}</small></span><span class="person-distance">${Math.round(distanceTo(shift, rider))}m</span>
       </button>`).join("")}</div>
     ${activePickup ? `<p class="passenger-note"><span>●</span> <b>${escapeText(person.name)}</b> is waiting at the glowing curb marker. Drive up and park next to them; press Space to let them in. Late fares remain deliverable for reduced pay.</p>` : activeDropoff ? `<p class="passenger-note"><span>●</span> Passenger aboard. Follow the green route and park by the destination marker. A missed deadline lowers pay and rating.</p>` : `<p class="passenger-note"><span>●</span> Riders are visible on the overhead map. Click a person or their name, then accept the pickup.</p>`}
-    <button class="button button-primary full-button ride-action" data-action="ride-action" ${shift.status === "stranded" ? "" : activePickup && distanceTo(shift, shift.trip.pickupAt) > 48 ? "disabled" : activeDropoff && distanceTo(shift, shift.trip.dropoffAt) > 48 ? "disabled" : !activePickup && !activeDropoff && !selectedPassengerId ? "disabled" : !activePickup && !activeDropoff && Math.abs(shift.speed) > 3 ? "disabled" : ""}>${escapeText(getActionText())}<span>↗</span></button>
+    <button class="button button-primary full-button ride-action" data-action="ride-action" ${shift.status === "disabled" ? "disabled" : shift.status === "stranded" ? "" : activePickup && distanceTo(shift, shift.trip.pickupAt) > 48 ? "disabled" : activeDropoff && distanceTo(shift, shift.trip.dropoffAt) > 48 ? "disabled" : !activePickup && !activeDropoff && !selectedPassengerId ? "disabled" : !activePickup && !activeDropoff && Math.abs(shift.speed) > 3 ? "disabled" : ""}>${escapeText(getActionText())}<span>↗</span></button>
   </section>`;
 }
 
@@ -208,14 +237,15 @@ function renderDrivingPanel() {
   const district = getDistrict(shift.districtId);
   const target = getTarget();
   return `<section class="panel driving-panel">
-    <div class="drive-topline"><div><span class="eyebrow">LIVE DRONE VIEW · STAGE ${DISTRICTS.indexOf(district) + 1} · ${escapeText(district.difficulty)} · ${formatClock(shift.clockMinutes)}</span><h1>${escapeText(district.name)}</h1></div><div class="shift-live"><i></i><span id="drive-status">${shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT"}</span></div></div>
+    <div class="drive-topline"><div><span class="eyebrow">LIVE DRONE VIEW · STAGE ${DISTRICTS.indexOf(district) + 1} · ${escapeText(district.difficulty)} · ${formatClock(shift.clockMinutes)}</span><h1>${escapeText(district.name)}</h1></div>    <div class="shift-live"><i></i><span id="drive-status">${shift.status === "disabled" ? "VEHICLE DISABLED" : shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT"}</span></div></div>
     <div class="scene-wrap">
       <canvas id="road-scene" tabindex="0" aria-label="Top-down drone view of the entire neighborhood: roads, homes, traffic, waiting passengers, taxi, and route. Click a person to choose them. Use WASD or arrow keys to drive."></canvas>
       <div class="scene-hud scene-hud-left"><span class="weather-pill"><i></i> CLEAR · DRY STREETS</span><span class="street-pill" id="street-name">${escapeText(streetNameFor({ x: shift.x, y: shift.y }))}</span></div>
       <div class="map-target-chip" id="map-target"><span id="route-symbol">${shift.trip?.status === "to-dropoff" ? "◎" : "⌖"}</span><span><small id="route-type">${shift.trip?.status === "to-pickup" ? "PASSENGER WAITING" : shift.trip?.status === "to-dropoff" ? "DROP-OFF LOCATION" : "SERVICE STATION"}</small><b id="route-distance">${Math.max(0, getTargetDistance())}m</b></span></div>
       <div class="speedometer"><strong id="speed">${Math.round(shift.speed)}</strong><span>KM/H</span><small>${district.limit} LIMIT</small><div class="speed-track"><i id="speed-meter"></i></div></div>
       <div class="scene-message" id="scene-message" role="status" aria-live="polite">${escapeText(shift.lastEvent)}</div>
-      ${shift.status === "stranded" ? `<div class="stranded-cover"><b>OUT OF FUEL</b><span>Roadside assistance can bring an emergency top-up.</span><button class="button button-primary" data-action="assist">Call roadside assistance</button></div>` : ""}
+      ${shift.status === "disabled" ? `<div class="stranded-cover disabled-cover"><b>TAXI DISABLED · 100% DAMAGE</b><span>Repair the car before driving. Any active fare will be cancelled.</span><button class="button button-primary" data-action="repair">Repair fully · ${formatMoney(Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE))}</button></div>` :
+        shift.status === "stranded" ? `<div class="stranded-cover"><b>OUT OF FUEL</b><span>Roadside assistance can bring an emergency top-up.</span><button class="button button-primary" data-action="assist">Call roadside assistance</button></div>` : ""}
     </div>
     <div class="drive-dashboard">
       <div class="dashboard-cell"><span class="dash-icon fuel-icon">◒</span><div><small>FUEL</small><b><span id="fuel">${shift.fuel.toFixed(1)}</span> / ${shift.maxFuel} L</b><div class="mini-track"><i id="fuel-meter" class="${shift.fuel < 9 ? "low" : ""}" style="width:${shift.fuel / shift.maxFuel * 100}%"></i></div></div></div>
@@ -246,11 +276,11 @@ function renderRightPanel() {
     <section class="panel car-panel"><div class="panel-heading"><div><span class="eyebrow">YOUR VEHICLE</span><h2>Morrowline S4</h2></div><span class="car-icon">▰</span></div>
       <div class="vehicle-illustration" aria-hidden="true"><span class="car-shadow"></span><span class="car-body"><i></i><b></b><em></em></span><span class="vehicle-plate">CITY TAXI</span></div>
       <div class="car-stat"><span>Fuel tank</span><b id="right-fuel">${shift.fuel.toFixed(1)} L <small>of ${shift.maxFuel}</small></b></div>
-      <div class="car-stat"><span>Top speed</span><b>${getCarStats(profile).maxSpeed} km/h</b></div>
+      <div class="car-stat"><span>Top speed</span><b id="right-top-speed">${Math.round(getCarStats(profile, shift.damage).maxSpeed)} km/h</b></div>
       <div class="car-stat"><span>Condition</span><b id="right-condition">${Math.max(0, 100 - shift.damage).toFixed(0)}%</b></div>
       <div class="car-stat"><span>Tyres</span><b>${profile.upgrades.includes("safety-tyres") ? "All-weather" : "Standard"}</b></div>
       ${refuelNearby ? `<button class="button button-secondary service-action" data-action="refuel">Refuel · about ${formatMoney(Math.round((shift.maxFuel - shift.fuel) * 185))}</button>` : ""}
-      ${shift.damage > 0 && canChangeDistrict() ? `<button class="button button-secondary service-action" data-action="repair">Repair · from ${formatMoney(Math.min(Math.ceil(shift.damage * 110), profile.cashCents))}</button>` : ""}
+      ${shift.damage > 0 && (canChangeDistrict() || shift.status === "disabled") ? `<button class="button button-secondary service-action" data-action="repair">${shift.status === "disabled" ? `Repair fully · ${formatMoney(Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE))}` : `Repair · from ${formatMoney(Math.min(Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE), profile.cashCents))}`}</button>` : ""}
       <p class="fuel-tip">${distanceTo(shift, fuelStation) < 650 ? `Fuel station is ${Math.round(distanceTo(shift, fuelStation))} m away.` : "Fuel costs $1.85/L. Roadside assistance prevents a fuel soft-lock."}</p>
       <span class="hidden-target" id="refuel-distance">${Math.round(distanceTo(shift, fuelStation))}</span>
     </section>
@@ -296,14 +326,26 @@ function render() {
     ${saveWarning ? `<div class="save-warning" role="alert"><span>!</span><p>${escapeText(saveWarning)}</p><button class="text-button" data-action="import">Restore save backup</button></div>` : ""}
     <main class="sim-layout"><div class="left-column">${renderTripPanel()}${renderDistrictPanel()}</div><div class="center-column">${renderDrivingPanel()}</div>${renderRightPanel()}</main>
     <footer class="footer"><span>© MORROWLINE NEIGHBORHOOD TAXI SERVICE</span><span>Top-down city view · Local save · Wallet optional</span><a href="./README.md">How to play</a></footer>
-    ${renderWalletPanel()}<div class="toast-region" id="toast" role="status" aria-live="polite"></div>`;
+    ${renderWalletPanel()}${renderTutorial()}<div class="toast-region" id="toast" role="status" aria-live="polite"></div>`;
   const canvas = document.querySelector("#road-scene");
   const renderer = createRoadRenderer(canvas);
   window.__morrowlineRenderer?.disconnect();
   window.__morrowlineRenderer = renderer;
   canvas.addEventListener("click", onMapClick);
   document.querySelector("#wallet-panel").hidden = true;
+  document.querySelector(".tutorial-dialog")?.focus();
   return district;
+}
+
+function closeTutorial() {
+  tutorialOpen = false;
+  render();
+  try {
+    localStorage.setItem(TUTORIAL_SEEN_KEY, "true");
+  } catch (error) {
+    showToast(`Tutorial preference could not be saved: ${error.message}`);
+  }
+  document.querySelector("#instructions-button")?.focus();
 }
 
 function onMapClick(event) {
@@ -358,7 +400,8 @@ function syncHud(now) {
   set("car-condition", `${Math.max(0, 100 - shift.damage).toFixed(0)}%`);
   set("right-condition", `${Math.max(0, 100 - shift.damage).toFixed(0)}%`);
   set("right-fuel", `${shift.fuel.toFixed(1)} L`);
-  set("drive-status", shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT");
+  set("drive-status", shift.status === "disabled" ? "VEHICLE DISABLED" : shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT");
+  set("right-top-speed", `${Math.round(getCarStats(profile, shift.damage).maxSpeed)} km/h`);
   const deadline = document.getElementById("fare-deadline");
   if (deadline) {
     deadline.textContent = shift.trip?.status === "complete" ? (shift.trip.late ? "LATE" : "ON TIME") :
@@ -368,10 +411,10 @@ function syncHud(now) {
   }
   const rideAction = document.querySelector(".ride-action");
   if (rideAction) {
-    rideAction.disabled = shift.status !== "stranded" &&
+    rideAction.disabled = shift.status === "disabled" || (shift.status !== "stranded" &&
       ((shift.trip?.status === "to-pickup" && gap > 48) ||
        (shift.trip?.status === "to-dropoff" && gap > 48) ||
-       (!shift.trip?.status?.startsWith("to-") && (!selectedPassengerId || Math.abs(shift.speed) > 3)));
+       (!shift.trip?.status?.startsWith("to-") && (!selectedPassengerId || Math.abs(shift.speed) > 3))));
     rideAction.innerHTML = `${escapeText(getActionText())}<span>↗</span>`;
   }
   const message = document.getElementById("scene-message");
@@ -386,7 +429,7 @@ function syncHud(now) {
 function frame(now) {
   const delta = lastFrame ? Math.min(.06, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  if (shift.status === "driving" && shift.trip?.status !== "complete" && !shift.closed) {
+  if (!tutorialOpen && shift.status === "driving" && shift.trip?.status !== "complete" && !shift.closed) {
     const controls = {
       accelerate: heldControls.has("accelerate"),
       brake: heldControls.has("brake") || heldControls.has("reverse"),
@@ -407,7 +450,11 @@ function frame(now) {
       if (result.events.length) {
         shift.lastEvent = result.events.at(-1);
         if (result.events.some((text) => text.includes("bump") || text.includes("Fuel empty"))) playBell();
-        if (shift.status === "stranded") render();
+        if (result.restarted) {
+          persist();
+          render();
+          showToast(shift.lastMessage);
+        } else if (shift.status === "stranded" || shift.status === "disabled") render();
       }
     }
   }
@@ -455,6 +502,10 @@ function updateLeaderboardPanel() {
 }
 
 function performObjective() {
+  if (shift.status === "disabled") {
+    showToast("The taxi is disabled. Repair it before continuing.");
+    return;
+  }
   if (shift.stranded) {
     const result = roadsideAssistance(shift, profile);
     shift = result.shift;
@@ -557,6 +608,14 @@ app.addEventListener("click", async (event) => {
     render();
   } else if (action === "ride-action") {
     performObjective();
+  } else if (action === "tutorial-open") {
+    tutorialOpen = true;
+    render();
+  } else if (action === "tutorial-close") {
+    closeTutorial();
+  } else if (action === "tutorial-backdrop") {
+    if (event.target !== button) return;
+    closeTutorial();
   } else if (action === "assist") {
     performObjective();
   } else if (action === "refuel") {
@@ -692,6 +751,11 @@ importFile.addEventListener("change", async () => {
 
 document.addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.target.matches("input,textarea,select,[contenteditable=true]")) return;
+  if (event.key === "Escape" && tutorialOpen) {
+    closeTutorial();
+    return;
+  }
+  if (tutorialOpen) return;
   const controls = {
     ArrowUp: "accelerate", w: "accelerate", W: "accelerate",
     ArrowDown: "brake", s: "brake", S: "brake",

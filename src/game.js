@@ -1,10 +1,11 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const STARTING_CASH_CENTS = 40_000;
 export const STARTING_FUEL = 48;
 export const BASE_FUEL_CAPACITY = 48;
 export const FUEL_PRICE_CENTS_PER_LITER = 185;
+export const REPAIR_CENTS_PER_DAMAGE = 110;
 export const CITY = {
   width: 1800,
   height: 1300,
@@ -44,11 +45,13 @@ export function availableDistricts(profile) {
   return DISTRICTS.filter((district, index) => index === 0 || isStageComplete(profile, DISTRICTS[index - 1].id));
 }
 
-export function getCarStats(profile) {
+export function getCarStats(profile, damage = 0) {
   const engine = profile.upgrades.includes("engine-tune");
+  const conditionFactor = Math.max(0.25, 1 - Math.max(0, Math.min(100, damage)) / 125);
   return {
-    acceleration: engine ? 17 : 11,
-    maxSpeed: engine ? 78 : 55,
+    acceleration: (engine ? 19 : 13) * conditionFactor,
+    maxSpeed: (engine ? 82 : 61) * conditionFactor,
+    steeringFactor: Math.max(0.45, 1 - Math.max(0, Math.min(100, damage)) / 180),
     fuelUsePerMeter: profile.upgrades.includes("eco-tune") ? .0033 : .0055,
     maxFuel: BASE_FUEL_CAPACITY + (profile.upgrades.includes("long-range-tank") ? 20 : 0)
   };
@@ -232,6 +235,23 @@ export function createShift(profile, districtId, random = Math.random) {
   return shift;
 }
 
+export function restartDistrict(shift, profile, random = Math.random) {
+  const district = getDistrict(shift.districtId);
+  if (!district) throw new Error(`Unknown district: ${shift.districtId}`);
+  const restarted = createShift(profile, district.id, random);
+  const updatedProfile = {
+    ...profile,
+    stageProgress: {
+      ...profile.stageProgress,
+      [district.id]: { fares: 0, onTimeFares: 0, coins: 0 }
+    }
+  };
+  const message = `No funds for a full repair. ${district.name} has restarted; its task progress reset. Your remaining cash and upgrades are kept.`;
+  restarted.lastMessage = message;
+  restarted.lastEvent = "District restarted · taxi repaired · task progress reset.";
+  return { shift: restarted, profile: updatedProfile, ok: true, message };
+}
+
 export function getPickupAt(shift) {
   return shift.trip?.status === "to-pickup" ? shift.trip.pickupAt : null;
 }
@@ -273,6 +293,7 @@ export function findPassenger(shift, passengerId) {
 }
 
 export function acceptRide(shift, profile, random = Math.random, passengerId) {
+  if (shift.damage >= 100 || shift.status === "disabled") return { shift: { ...shift, lastMessage: "The taxi is disabled. Repair it before accepting a fare." }, ok: false };
   if (shift.status === "stranded" || shift.fuel <= 0) return { shift: { ...shift, lastMessage: "You're out of fuel. Call roadside assistance before accepting a fare." }, ok: false };
   if (Math.abs(shift.speed) > 3) return { shift: { ...shift, lastMessage: "Stop the taxi before accepting a passenger's pickup." }, ok: false };
   if (shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff") return { shift: { ...shift, lastMessage: "Finish your current passenger's trip before accepting another fare." }, ok: false };
@@ -437,7 +458,7 @@ function updateTraffic(shift, dt) {
 }
 
 export function advanceShift(input, controls, deltaSeconds, profile) {
-  if (input.closed || input.stranded || input.status === "idle") return { shift: input, events: [], profile };
+  if (input.closed || input.stranded || input.status === "disabled" || input.damage >= 100 || input.status === "idle") return { shift: input, events: [], profile };
   const dt = Math.min(.06, Math.max(0, deltaSeconds));
   if (!dt) return { shift: input, events: [], profile };
   const shift = {
@@ -459,7 +480,7 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
   shift.wasBraking = braking;
   shift.collisionCooldown = Math.max(0, shift.collisionCooldown - dt);
 
-  const carStats = getCarStats(profile);
+  const carStats = getCarStats(profile, shift.damage);
   if (throttle > 0) shift.speed += carStats.acceleration * dt;
   else if (throttle < 0) shift.speed -= (shift.speed > 0 ? 32 : 12) * dt;
   else shift.speed *= Math.max(0, 1 - (braking ? 4.2 : .8) * dt);
@@ -470,7 +491,7 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
 
   const steering = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
   if (steering) {
-    const steeringSpeed = .9 / (1 + Math.max(0, Math.abs(shift.speed) - 25) / 35);
+    const steeringSpeed = .9 * carStats.steeringFactor / (1 + Math.max(0, Math.abs(shift.speed) - 25) / 35);
     shift.heading += steering * steeringSpeed * dt * Math.sign(shift.speed || 1);
   }
   const previous = { x: shift.x, y: shift.y };
@@ -578,6 +599,17 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
     shift.lastMessage = "The engine ran out of fuel. Call roadside assistance for an emergency top-up.";
     events.push("Fuel empty — request roadside assistance.");
   }
+  if (shift.damage >= 100) {
+    shift.damage = 100;
+    shift.speed = 0;
+    shift.status = "disabled";
+    shift.lastMessage = `Taxi disabled. Repair it for ${formatMoney(REPAIR_CENTS_PER_DAMAGE * 100)} before driving again.`;
+    events.push("Vehicle disabled · repair required before driving.");
+    if (updatedProfile.cashCents < REPAIR_CENTS_PER_DAMAGE * 100) {
+      const restarted = restartDistrict(shift, updatedProfile);
+      return { shift: restarted.shift, events: [restarted.message], profile: restarted.profile, restarted: true };
+    }
+  }
   return { shift, events, profile: updatedProfile };
 }
 
@@ -607,11 +639,31 @@ export function roadsideAssistance(shift, profile) {
 }
 
 export function repairCar(shift, profile) {
-  if (Math.abs(shift.speed) > 2 || shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff") return { shift, profile, ok: false, message: "Finish the current fare and park before visiting the mechanic." };
-  const costCents = Math.min(shift.damage * 110, profile.cashCents);
+  const disabled = shift.damage >= 100 || shift.status === "disabled";
+  if (!disabled && (Math.abs(shift.speed) > 2 || shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff")) {
+    return { shift, profile, ok: false, message: "Finish the current fare and park before visiting the mechanic." };
+  }
+  const fullRepairCost = Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE);
+  if (disabled && profile.cashCents < fullRepairCost) return restartDistrict(shift, profile);
+  const costCents = Math.min(fullRepairCost, profile.cashCents);
   if (costCents <= 0 || shift.damage <= 0) return { shift: { ...shift, lastMessage: "Your car does not need any repairs." }, profile, ok: false, message: "Your car does not need any repairs." };
-  const repaired = costCents / 110;
-  return { shift: { ...shift, damage: Math.max(0, shift.damage - repaired), lastMessage: `Mechanic repaired ${repaired.toFixed(0)}% damage for ${formatMoney(costCents)}.` }, profile: { ...profile, cashCents: profile.cashCents - costCents }, ok: true, costCents };
+  const repaired = Math.min(shift.damage, costCents / REPAIR_CENTS_PER_DAMAGE);
+  const remainingDamage = Math.max(0, shift.damage - repaired);
+  const passengers = disabled
+    ? shift.passengers.map((rider) => rider.state === "waiting" ? rider : { ...rider, state: "waiting" })
+    : shift.passengers;
+  const updatedShift = {
+    ...shift,
+    damage: remainingDamage,
+    stranded: disabled ? false : shift.stranded,
+    status: disabled ? "driving" : shift.status,
+    trip: disabled ? null : shift.trip,
+    passenger: disabled ? null : shift.passenger,
+    passengers,
+    lastMessage: `Mechanic repaired ${repaired.toFixed(0)}% damage for ${formatMoney(costCents)}.${disabled && shift.trip ? " The active fare was cancelled." : ""}`,
+    lastEvent: "Vehicle repaired."
+  };
+  return { shift: updatedShift, profile: { ...profile, cashCents: profile.cashCents - costCents }, ok: true, costCents };
 }
 
 export function purchaseGarageItem(profile, id) {

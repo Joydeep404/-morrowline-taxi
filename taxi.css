@@ -193,9 +193,9 @@ a { color: inherit; }
   .settings-panel { grid-column:1/-1; }
 }
 @media(max-width:760px) {
-  .topbar { min-height:64px;padding:8px 13px;gap:7px; }
+  .topbar { min-height:64px;padding:8px 13px;gap:7px;flex-wrap:wrap; }
   .brand { gap:7px; }.brand-mark { width:31px;height:31px;font-size:20px; }.brand strong { font-size:10px; }.brand small { font-size:6px; }
-  .topbar-status { gap:5px; }.cash-chip,.rating-chip { min-height:33px;padding:3px 7px;column-gap:5px; }.cash-chip strong,.rating-chip b { font-size:10px; }.cash-chip small,.rating-chip small { font-size:6px; }
+  .topbar-status { width:100%;margin-left:0;justify-content:space-between;gap:5px; }.cash-chip,.rating-chip { min-height:33px;padding:3px 7px;column-gap:5px; }.cash-chip strong,.rating-chip b { font-size:10px; }.cash-chip small,.rating-chip small { font-size:6px; }
   .wallet-chip { min-height:30px;padding:0 6px;font-size:0; }.wallet-dot { margin:0; }
   .sim-layout { display:flex;flex-direction:column;gap:10px;margin:14px auto 28px;padding:0 10px; }
   .left-column,.center-column,.right-column { width:100%; }.center-column { order:0; }.left-column { order:1; }.right-column { order:2;grid-template-columns:1fr; }
@@ -281,6 +281,26 @@ a { color: inherit; }
 .trip-stats #fare-deadline.late { color:#e8957d; }
 .legend-row b,.legend-row small { display:block; }.legend-row b { color:#e0ddd1;font-size:9px; }.legend-row small { margin-top:2px;color:#89979e;font-size:7px; }
 .map-note { padding:8px;border-left:2px solid rgba(214,173,112,.45);background:rgba(214,173,112,.05);color:#98a6ac;font-size:8px;line-height:1.5; }
+.instructions-button { min-height:35px;padding:0 12px;border:1px solid rgba(214,173,112,.43);background:rgba(214,173,112,.07);color:#e0c58f;font-size:10px;cursor:pointer;white-space:nowrap; }
+.instructions-button:hover { border-color:#d6ad70;background:rgba(214,173,112,.14); }
+.tutorial-backdrop { position:fixed;z-index:20;inset:0;display:grid;place-items:center;padding:18px;background:rgba(5,10,15,.78);backdrop-filter:blur(5px); }
+.tutorial-dialog { width:min(520px,100%);max-height:min(90vh,760px);overflow:auto;padding:22px;border:1px solid rgba(214,173,112,.38);background:linear-gradient(150deg,#233546,#172532);box-shadow:0 24px 80px rgba(0,0,0,.62); }
+.tutorial-dialog h2 { margin:4px 0 0;font:600 22px Georgia,"Times New Roman",serif; }
+.tutorial-dialog:focus { outline:none; }
+.tutorial-steps { display:grid;gap:12px;margin:20px 0;padding-left:23px;color:#d9c28f; }
+.tutorial-steps li { padding-left:3px; }
+.tutorial-steps li::marker { color:#d6ad70;font:12px "Consolas",monospace; }
+.tutorial-steps b,.tutorial-steps span { display:block; }
+.tutorial-steps b { margin-bottom:3px;color:#ede8d9;font-size:12px; }
+.tutorial-steps span { color:#aab7bb;font-size:10px;line-height:1.55; }
+.disabled-cover { background:rgba(37,20,20,.84); }
+.disabled-cover b { color:#f0b49a;font-size:17px; }
+.disabled-cover span { max-width:260px;line-height:1.5; }
+@media(max-width:760px) {
+  .instructions-button { min-height:32px;padding:0 8px;font-size:9px; }
+  .tutorial-dialog { padding:17px; }
+  .tutorial-steps { gap:9px;margin:15px 0; }
+}
 @media(max-width:1190px) {
   .city-progress { display:none; }
 }

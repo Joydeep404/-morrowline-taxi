@@ -1,7 +1,8 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import { newProfile, SAVE_VERSION } from "./game.js";
 
-export const SAVE_KEY = "morrowline.taxi-save.v4";
+export const SAVE_KEY = "morrowline.taxi-save.v5";
+export const LEGACY_TAXI_V4_SAVE_KEY = "morrowline.taxi-save.v4";
 export const LEGACY_TAXI_SAVE_KEY = "morrowline.taxi-save.v3";
 export const LEGACY_TAXI_V2_SAVE_KEY = "morrowline.taxi-save.v2";
 export const LEGACY_SAVE_KEY = "morrowline.save.v1";
@@ -97,10 +98,19 @@ function migrateTaxiSave(storage, key, version) {
   migrated.upgrades = Array.isArray(previous.upgrades)
     ? [...new Set(previous.upgrades.filter((id) => GARAGE_ITEMS.some((item) => item.id === id)))]
     : [];
+  migrated.coins = Number.isSafeInteger(previous.coins) && previous.coins >= 0 ? previous.coins : 0;
   migrated.districtsVisited = Array.isArray(previous.districtsVisited)
     ? [...new Set(previous.districtsVisited.filter((id) => DISTRICTS.some((district) => district.id === id)))]
     : [];
   migrateStageProgress(migrated);
+  if (version >= 4 && previous.stageProgress && typeof previous.stageProgress === "object" && !Array.isArray(previous.stageProgress)) {
+    for (const district of DISTRICTS) {
+      const progress = previous.stageProgress[district.id];
+      if (progress && ["fares", "onTimeFares", "coins"].every((key) => Number.isSafeInteger(progress[key]) && progress[key] >= 0)) {
+        migrated.stageProgress[district.id] = { fares: progress.fares, onTimeFares: progress.onTimeFares, coins: progress.coins };
+      }
+    }
+  }
   migrated.totalMeters = Number.isFinite(previous.totalMeters) && previous.totalMeters >= 0 ? previous.totalMeters : 0;
   migrated.cleanRides = Number.isSafeInteger(previous.cleanRides) && previous.cleanRides >= 0 ? previous.cleanRides : 0;
   migrated.settings = {
@@ -121,7 +131,8 @@ export function loadProfile(storage = globalThis.localStorage) {
     }
   }
   if (storage) {
-    const migrated = migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
+    const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
+      migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
       migrateTaxiSave(storage, LEGACY_TAXI_V2_SAVE_KEY, 2) ??
       migrateCourierSave(storage);
     if (migrated) {
