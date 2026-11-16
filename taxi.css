@@ -175,6 +175,9 @@ a { color: inherit; }
 .toggle::after { content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#a4afbb;transition:.18s ease; }.setting-row input:checked + .toggle { border-color:#73ad9d;background:rgba(87,153,132,.4); }.setting-row input:checked + .toggle::after { left:15px;background:#b0e0cb; }
 .setting-row input:focus-visible + .toggle { outline:2px solid #f1cf91;outline-offset:3px; }
 .backup-actions { display:flex;justify-content:space-between;gap:8px;margin-top:8px; }.backup-actions .text-button { font-size:7px; }.save-note { margin:7px 0 0;color:#7a8992;font-size:7px;line-height:1.5; }
+.restart-actions { display:grid;gap:6px;margin-top:11px; }.restart-actions .button { min-height:32px;font-size:8px; }
+.button-danger { border-color:rgba(207,122,105,.42);background:rgba(136,61,52,.16);color:#e8a493; }
+.button-danger:hover { border-color:#cf7a69;background:rgba(136,61,52,.27); }
 .footer { max-width:1540px;margin:auto;padding:0 3.2% 20px;display:flex;align-items:center;gap:17px;color:#697982;font:7px "Consolas",monospace;letter-spacing:.06em; }.footer a { margin-left:auto;color:#b29a6f;text-decoration:none; }.footer a:hover { color:#e4c68e; }
 .wallet-drawer { position:fixed;z-index:10;top:83px;right:max(3.2%,calc((100vw - 1540px)/2 + 3.2%));width:min(410px,calc(100vw - 24px));max-height:calc(100vh - 99px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:19px;box-shadow:0 20px 70px rgba(0,0,0,.62); }.wallet-drawer[hidden] { display:none; }
 @supports (height: 100dvh) { .wallet-drawer { max-height:calc(100dvh - 99px); } }

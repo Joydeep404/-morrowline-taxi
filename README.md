@@ -35,6 +35,7 @@ npm start
 - Each neighborhood has a different deadline, traffic load, and number of roadwork barriers. Steer around the striped barriers; collisions damage the taxi and hurt your rating.
 - Each stage has its own checklist: finish fares, meet on-time targets, and collect glowing coins from the streets. After completing it, pay a one-time entry permit from driver earnings to unlock the next neighborhood: Maple Heights $50, Riverside $100, Market District $175, and Airport Road $250. Replay fares to earn more if needed.
 - A first-shift tutorial explains passenger pickups, driving controls, objectives, fuel, and repairs. Reopen it any time with **Instructions**.
+- In **Settings**, restart the current level's shift while keeping saved progress, or restart the whole local game after two confirmations. A whole-game restart does not remove any Sepolia shop items held by your wallet.
 - On-time fares earn 2 Morrow coins. Drive over the gold coin markers to collect more; spend coins on garage upgrades. Driver earnings pay fuel, repairs, and neighborhood entry permits.
 - The displayed street speed limit, smooth braking, and collision-free driving affect passenger ratings and tips.
 - Collisions and off-road driving damage the taxi. Damage reduces acceleration, top speed, and handling; at 100% damage the taxi stops until fully repaired. A full repair costs $110. If remaining cash is below the repair cost, the current district restarts with a repaired car and its objective progress reset; cash, upgrades, and other districts' progress are kept.

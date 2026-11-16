@@ -325,6 +325,8 @@ function renderRightPanel() {
     <section class="panel settings-panel"><div class="panel-heading"><div><span class="eyebrow">PREFERENCES & BACKUP</span><h2>Settings</h2></div></div>
       <label class="setting-row"><span><b>Sound cue</b><small>Soft chime for fare events</small></span><input type="checkbox" data-setting="sound" ${profile.settings.sound ? "checked" : ""}><i class="toggle"></i></label>
       <label class="setting-row"><span><b>Reduced motion</b><small>Remove subtle road shimmer</small></span><input type="checkbox" data-setting="reducedMotion" ${profile.settings.reducedMotion ? "checked" : ""}><i class="toggle"></i></label>
+      <div class="restart-actions"><button class="button button-secondary" data-action="restart-level">Restart current level</button><button class="button button-danger" data-action="restart-game">Restart whole game</button></div>
+      <p class="save-note">Restarting the level cancels the current fare but keeps your earnings, upgrades, and challenge progress. Restarting the whole game resets local progress only; on-chain shop items are not affected.</p>
       <div class="backup-actions"><button class="text-button" data-action="export">Export taxi save</button><button class="text-button" data-action="import">Restore save</button></div>
       <p class="save-note">Progress stays in this browser. Download a JSON backup to move it to another device.</p>
     </section>
@@ -785,6 +787,26 @@ app.addEventListener("click", async (event) => {
     shift.damage = previous.damage;
     selectedPassengerId = null;
     render();
+  } else if (action === "restart-level") {
+    if (!window.confirm("Restart this level's shift from the beginning?\n\nThe current fare will be cancelled. Earnings, garage upgrades, unlocked neighborhoods, and challenge progress will be kept.")) return;
+    shift = createShift(profile, selectedDistrict);
+    selectedPassengerId = null;
+    persist();
+    render();
+    showToast(`${getDistrict(selectedDistrict).name} shift restarted. Your saved progress was kept.`);
+  } else if (action === "restart-game") {
+    const confirmed = window.confirm("Restart the whole game?\n\nThis resets all local driver earnings, Morrow coins, rides, upgrades, neighborhood unlocks, and challenge progress in this browser. Sepolia wallet items are on-chain and will not be changed.");
+    if (!confirmed || window.prompt("Type RESET to confirm clearing this browser's local game progress.") !== "RESET") return;
+    profile = newProfile();
+    selectedDistrict = DISTRICTS[0].id;
+    shift = createShift(profile, selectedDistrict);
+    selectedPassengerId = null;
+    mapZoom = 1;
+    pendingProgress = null;
+    pendingShop = null;
+    persist();
+    render();
+    showToast("A new game has started. On-chain Sepolia items remain in your wallet.");
   } else if (action === "ride-action") {
     performObjective();
   } else if (action === "tutorial-open") {
