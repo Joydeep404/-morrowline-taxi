@@ -1,1 +1,1 @@
-export const SHOP_CONTRACT_ADDRESS = "";
+export const SHOP_CONTRACT_ADDRESS = "0x234f05ddff4574700fd169ee2fa54067f733cf04";
