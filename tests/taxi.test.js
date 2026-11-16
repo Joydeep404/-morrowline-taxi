@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DISTRICTS, GARAGE_ITEMS } from "../src/districts.js";
 import {
-  acceptRide, advanceShift, availableDistricts, canUnlockDistrict, createShift, dropOffPassenger,
-  formatMoney, getCarStats, isParkedAtObjective, newProfile, nextFuelStation, purchaseGarageItem,
+  acceptRide, advanceShift, applyFuelBoost, applyRepairKit, availableDistricts, canUnlockDistrict, createShift, dropOffPassenger,
+  FUEL_STATIONS, formatMoney, getCarStats, isParkedAtObjective, newProfile, nextFuelStation, purchaseGarageItem,
   rateRide, refuel, repairCar, roadsideAssistance, takePassenger, unlockDistrict
 } from "../src/game.js";
 import {
-  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, LEGACY_TAXI_V4_SAVE_KEY, LEGACY_TAXI_V5_SAVE_KEY, loadProfile,
+  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, LEGACY_TAXI_V4_SAVE_KEY, LEGACY_TAXI_V5_SAVE_KEY, LEGACY_TAXI_V6_SAVE_KEY, loadProfile,
   SAVE_KEY, saveProfile, validateProfile
 } from "../src/save.js";
 import { getMapTransform } from "../src/renderer.js";
@@ -376,7 +376,7 @@ test("taxi v3 saves migrate progress and settings without removing the source ba
   assert.equal(profile.rides, 2);
   assert.deepEqual(profile.upgrades, ["eco-tune"]);
   assert.equal(profile.settings.sound, true);
-  assert.equal(profile.version, 6);
+  assert.equal(profile.version, 7);
   assert.equal(availableDistricts(profile).length, 3);
   assert.equal(storage.stored.has(LEGACY_TAXI_SAVE_KEY), true);
   assert.equal(storage.stored.has(SAVE_KEY), true);
@@ -386,7 +386,7 @@ test("taxi v2 saves migrate using the preserved legacy key", () => {
   const previous = { ...newProfile(), version: 2, cashCents: 5000, rides: 1 };
   const storage = memoryStorage([[LEGACY_TAXI_V2_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 6);
+  assert.equal(profile.version, 7);
   assert.equal(profile.cashCents, 5000);
   assert.equal(availableDistricts(profile).length, 2);
 });
@@ -407,7 +407,7 @@ test("a broken current save falls back to the latest valid legacy backup", () =>
     [LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]
   ]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 6);
+  assert.equal(profile.version, 7);
   assert.equal(profile.coins, 11);
   assert.equal(profile.cashCents, 9600);
   assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 3 });
@@ -427,7 +427,7 @@ test("taxi v4 saves migrate without losing coins or neighborhood objective progr
   };
   const storage = memoryStorage([[LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 6);
+  assert.equal(profile.version, 7);
   assert.equal(profile.coins, 17);
   assert.equal(profile.cashCents, 12800);
   assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 2 });
@@ -447,10 +447,26 @@ test("taxi v5 saves migrate with previously earned neighborhood access", () => {
   };
   const storage = memoryStorage([[LEGACY_TAXI_V5_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 6);
+  assert.equal(profile.version, 7);
   assert.equal(profile.cashCents, 17800);
   assert.deepEqual(profile.districtsUnlocked, ["old-town", "maple-heights", "riverside"]);
   assert.equal(storage.stored.has(LEGACY_TAXI_V5_SAVE_KEY), true);
+});
+
+test("taxi v6 saves migrate paint preference and preserve existing progress", () => {
+  const previous = {
+    ...newProfile(),
+    version: 6,
+    coins: 17,
+    settings: { sound: true, reducedMotion: true }
+  };
+  const storage = memoryStorage([[LEGACY_TAXI_V6_SAVE_KEY, JSON.stringify(previous)]]);
+  const profile = loadProfile(storage);
+  assert.equal(profile.version, 7);
+  assert.equal(profile.coins, 17);
+  assert.equal(profile.settings.taxiPaint, "standard");
+  assert.equal(profile.settings.sound, true);
+  assert.equal(storage.stored.has(LEGACY_TAXI_V6_SAVE_KEY), true);
 });
 
 test("old courier saves migrate credits and settings without losing the source backup", () => {
@@ -482,6 +498,46 @@ test("whole-city map transform fits and maps city coordinates to the canvas", ()
   assert.ok(transform.originX >= 0 && transform.originY >= 0);
   assert.ok(transform.sx(1800) <= 800);
   assert.ok(transform.sy(1300) <= 450);
+});
+
+test("city zoom follows the taxi while keeping the map edges inside the viewport", () => {
+  const centered = getMapTransform(800, 450, 1.5, { x: 900, y: 650 });
+  assert.ok(centered.scale > getMapTransform(800, 450).scale);
+  assert.ok(Math.abs(centered.sx(900) - 400) < 1);
+  const atEdge = getMapTransform(800, 450, 2.5, { x: 0, y: 0 });
+  assert.equal(atEdge.originX, 0);
+  assert.equal(atEdge.originY, 0);
+});
+
+test("multiple fuel stations are searchable and the nearest station guides refuelling", () => {
+  assert.equal(FUEL_STATIONS.length, 3);
+  assert.deepEqual(nextFuelStation({ x: FUEL_STATIONS[2].x + 5, y: FUEL_STATIONS[2].y }), FUEL_STATIONS[2]);
+});
+
+test("new shifts include moving roadside pedestrians", () => {
+  const shift = createShift(newProfile(), DISTRICTS[0].id, constantRandom(.5));
+  assert.equal(shift.walkers.length, 22);
+  const before = shift.walkers.map(({ x, y }) => [x, y]);
+  const advanced = advanceShift(shift, { accelerate: true }, .06, newProfile()).shift;
+  assert.ok(advanced.walkers.some((walker, index) =>
+    walker.x !== before[index][0] || walker.y !== before[index][1]
+  ));
+});
+
+test("Sepolia fuel and repair boosts restore vehicle state without driver earnings", () => {
+  const base = createShift(newProfile(), DISTRICTS[0].id, constantRandom(.5));
+  const fuelResult = applyFuelBoost({ ...base, fuel: 2 });
+  assert.equal(fuelResult.added, 25);
+  assert.equal(fuelResult.shift.fuel, 27);
+  const stranded = applyFuelBoost({ ...base, fuel: 0, stranded: true, status: "stranded" });
+  assert.equal(stranded.shift.status, "driving");
+  assert.equal(stranded.shift.stranded, false);
+  assert.equal(stranded.shift.fuel, 25);
+
+  const repairResult = applyRepairKit({ ...base, damage: 100, status: "disabled" });
+  assert.equal(repairResult.repaired, 35);
+  assert.equal(repairResult.shift.damage, 65);
+  assert.equal(repairResult.shift.status, "driving");
 });
 
 test("wallet status distinguishes missing MetaMask, wrong chain, and optional Sepolia connection", async () => {

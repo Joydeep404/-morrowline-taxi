@@ -228,6 +228,18 @@ a { color: inherit; }
 .publish-confirm p { color:#c2c9c4;font-size:8px;line-height:1.55; }
 .publish-confirm p b { color:#f0cf87; }
 .publish-confirm .text-button { margin-left:9px; }
+.onchain-shop { margin:13px 0;padding:11px;border:1px solid rgba(125,181,160,.28);background:rgba(8,15,23,.18); }
+.onchain-shop .leaderboard-heading>span { color:#91b8a6;font:7px "Consolas",monospace; }
+.shop-description { color:#aab5b8;font-size:8px;line-height:1.55; }
+.shop-item { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:9px 0;border-top:1px solid rgba(203,193,166,.08); }
+.shop-item>div { min-width:0; }.shop-item>div>b,.shop-item>div>small { display:block; }
+.shop-item>div>b { color:#e4e0d1;font-size:9px; }.shop-item>div>small { margin-top:3px;color:#89979e;font-size:8px;line-height:1.4; }
+.shop-stock { color:#d5b97f;font:7px "Consolas",monospace;white-space:nowrap; }
+.shop-item-action { grid-column:1/-1;width:100%;min-height:30px;font-size:8px; }
+.map-zoom-controls { position:absolute;z-index:2;right:11px;bottom:11px;display:flex;align-items:center;gap:3px;padding:4px;border:1px solid rgba(239,234,216,.24);background:rgba(19,31,37,.82);backdrop-filter:blur(4px); }
+.map-zoom-controls button { width:27px;height:26px;border:1px solid rgba(193,184,158,.28);background:rgba(255,255,255,.04);color:#e6d3a8;font-size:17px;cursor:pointer; }
+.map-zoom-controls button:hover { border-color:var(--brass);background:rgba(214,173,112,.12); }
+.map-zoom-controls span { min-width:39px;color:#d9ded3;font:8px "Consolas",monospace;text-align:center; }
 .stage-objective { margin:12px 0 8px;padding:10px;border:1px solid rgba(214,173,112,.2);background:rgba(8,15,23,.18); }
 .objective-heading,.objective-row { display:flex;align-items:center;justify-content:space-between;gap:8px; }
 .objective-heading { margin-bottom:7px;color:#d9bd82;font:8px "Consolas",monospace;letter-spacing:.08em; }
@@ -307,6 +319,7 @@ a { color: inherit; }
 @media(max-width:760px) {
   .trip-panel,.map-legend-panel { padding:12px; }
   .map-target-chip { top:auto;right:8px;bottom:59px; }
+  .map-zoom-controls { right:8px;bottom:8px; }
   .scene-hud { top:8px;left:8px; }
   .weather-pill,.street-pill { padding:5px 6px;font-size:6px; }
 }

@@ -1,6 +1,6 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const STARTING_CASH_CENTS = 40_000;
 export const STARTING_FUEL = 48;
 export const BASE_FUEL_CAPACITY = 48;
@@ -13,6 +13,11 @@ export const CITY = {
   verticalRoads: [130, 440, 750, 1060, 1370, 1680],
   horizontalRoads: [110, 350, 590, 830, 1070, 1290]
 };
+export const FUEL_STATIONS = Object.freeze([
+  Object.freeze({ id: "fuel-station-1", x: 130, y: 350 }),
+  Object.freeze({ id: "fuel-station-2", x: 750, y: 110 }),
+  Object.freeze({ id: "fuel-station-3", x: 1370, y: 1070 })
+]);
 
 function randomBetween(min, max, random = Math.random) {
   return min + random() * (max - min);
@@ -103,6 +108,7 @@ function spawnCoins(shift) {
     CITY.horizontalRoads.map((y) => ({ x, y }))
   ).filter((point) =>
     distanceTo(point, shift) > 160 &&
+    FUEL_STATIONS.every((station) => distanceTo(point, station) > 100) &&
     shift.roadworks.every((barrier) => distanceTo(point, barrier) > 90)
   );
   for (let index = candidates.length - 1; index > 0; index -= 1) {
@@ -182,6 +188,29 @@ function spawnPassengers(shift, amount = 5, exclude = []) {
   }
 }
 
+function spawnWalkers(shift, amount = 22) {
+  const colors = ["#d77b62", "#738daf", "#d0b266", "#7d9d78", "#b687a0", "#e0d2b7"];
+  for (let index = 0; index < amount; index += 1) {
+    const horizontal = seededRandom(shift) < .5;
+    const roads = horizontal ? CITY.horizontalRoads : CITY.verticalRoads;
+    const road = roads[Math.floor(seededRandom(shift) * roads.length)];
+    const direction = seededRandom(shift) < .5 ? 1 : -1;
+    const offset = direction * (CITY.roadWidth / 2 + 17 + seededRandom(shift) * 8);
+    const position = horizontal
+      ? { x: 80 + seededRandom(shift) * (CITY.width - 160), y: road + offset }
+      : { x: road + offset, y: 80 + seededRandom(shift) * (CITY.height - 160) };
+    shift.walkers.push({
+      id: `${shift.districtId}-walker-${index + 1}`,
+      ...position,
+      axis: horizontal ? "horizontal" : "vertical",
+      direction: seededRandom(shift) < .5 ? 1 : -1,
+      speed: 1.1 + seededRandom(shift) * 1.2,
+      stride: seededRandom(shift) * Math.PI * 2,
+      color: colors[Math.floor(seededRandom(shift) * colors.length)]
+    });
+  }
+}
+
 function spawnTraffic(shift, amount = 13) {
   const colors = ["#6e8998", "#bd795e", "#d0c3a0", "#648477", "#81779a", "#f0e2c7", "#9d8060"];
   for (let index = 0; index < amount; index += 1) {
@@ -213,7 +242,7 @@ export function newProfile() {
     reputation: 4.8,
     bestRating: 4.8,
     upgrades: [],
-    settings: { sound: false, reducedMotion: false },
+    settings: { sound: false, reducedMotion: false, taxiPaint: "standard" },
     districtsUnlocked: [DISTRICTS[0].id],
     districtsVisited: [],
     stageProgress: newStageProgress(),
@@ -248,6 +277,7 @@ export function createShift(profile, districtId, random = Math.random) {
     damage: 0,
     passenger: null,
     passengers: [],
+    walkers: [],
     trip: null,
     traffic: [],
     coins: [],
@@ -272,6 +302,7 @@ export function createShift(profile, districtId, random = Math.random) {
     closed: false
   };
   spawnPassengers(shift, 6);
+  spawnWalkers(shift, 22);
   spawnTraffic(shift, district.trafficCount);
   spawnCoins(shift);
   return shift;
@@ -303,11 +334,9 @@ export function getDropoffAt(shift) {
 }
 
 export function nextFuelStation(shift) {
-  const stationGrid = CITY.verticalRoads.map((x, index) => ({
-    x,
-    y: CITY.horizontalRoads[(index * 2 + 1) % CITY.horizontalRoads.length]
-  }));
-  return stationGrid.sort((a, b) => Math.hypot(a.x - shift.x, a.y - shift.y) - Math.hypot(b.x - shift.x, b.y - shift.y))[0];
+  return FUEL_STATIONS.reduce((nearest, station) =>
+    distanceTo(station, shift) < distanceTo(nearest, shift) ? station : nearest
+  );
 }
 
 export function distanceTo(a, b) {
@@ -499,6 +528,18 @@ function updateTraffic(shift, dt) {
   }
 }
 
+function updateWalkers(shift, dt) {
+  for (const walker of shift.walkers) {
+    const amount = walker.direction * walker.speed * dt;
+    if (walker.axis === "horizontal") {
+      walker.x = (walker.x + amount + CITY.width) % CITY.width;
+    } else {
+      walker.y = (walker.y + amount + CITY.height) % CITY.height;
+    }
+    walker.stride += dt * walker.speed * 2;
+  }
+}
+
 export function advanceShift(input, controls, deltaSeconds, profile) {
   if (input.closed || input.stranded || input.status === "disabled" || input.damage >= 100 || input.status === "idle") return { shift: input, events: [], profile };
   const dt = Math.min(.06, Math.max(0, deltaSeconds));
@@ -509,6 +550,7 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
     roadworks: input.roadworks.map((barrier) => ({ ...barrier })),
     coins: input.coins.map((coin) => ({ ...coin })),
     passengers: input.passengers.map((person) => ({ ...person })),
+    walkers: (input.walkers ?? []).map((walker) => ({ ...walker })),
     trip: input.trip ? { ...input.trip } : null,
     passenger: input.passenger ? { ...input.passenger } : null
   };
@@ -578,6 +620,7 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
   const fuelRate = carStats.fuelUsePerMeter;
   shift.fuel = Math.max(0, shift.fuel - metersMoved * fuelRate);
   updateTraffic(shift, dt);
+  updateWalkers(shift, dt);
   const collectedCoins = shift.coins.filter((coin) => distanceTo(shift, coin) <= 25);
   let updatedProfile = profile;
   if (collectedCoins.length) {
@@ -631,8 +674,8 @@ export function advanceShift(input, controls, deltaSeconds, profile) {
   } else if (insideIntersection && shift.speed > 38 && !events.length && shift.trip?.status === "to-dropoff") {
     shift.lastEvent = "Cross the intersection carefully. Watch for moving traffic.";
   }
-  const station = nextFuelStation(shift);
-  shift.serviceNearby = distanceTo(shift, station) <= 48 && shift.speed <= 2 && shift.fuel < shift.maxFuel - .1;
+  shift.serviceNearby = FUEL_STATIONS.some((station) => distanceTo(shift, station) <= 48) &&
+    shift.speed <= 2 && shift.fuel < shift.maxFuel - .1;
   if (shift.fuel <= 0 && !shift.stranded) {
     shift.fuel = 0;
     shift.speed = 0;
@@ -685,6 +728,7 @@ export function repairCar(shift, profile) {
   if (!disabled && (Math.abs(shift.speed) > 2 || shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff")) {
     return { shift, profile, ok: false, message: "Finish the current fare and park before visiting the mechanic." };
   }
+
   const fullRepairCost = Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE);
   if (disabled && profile.cashCents < fullRepairCost) return restartDistrict(shift, profile);
   const costCents = Math.min(fullRepairCost, profile.cashCents);
@@ -706,6 +750,47 @@ export function repairCar(shift, profile) {
     lastEvent: "Vehicle repaired."
   };
   return { shift: updatedShift, profile: { ...profile, cashCents: profile.cashCents - costCents }, ok: true, costCents };
+}
+
+export function applyFuelBoost(shift, liters = 25) {
+  if (!Number.isFinite(liters) || liters <= 0) throw new Error("Fuel boost must add a positive amount.");
+  const wasStranded = shift.stranded || shift.status === "stranded";
+  const fuel = Math.min(shift.maxFuel, shift.fuel + liters);
+  if (fuel <= shift.fuel) return { shift, added: 0 };
+  return {
+    shift: {
+      ...shift,
+      fuel,
+      speed: wasStranded ? 0 : shift.speed,
+      stranded: wasStranded ? false : shift.stranded,
+      status: wasStranded ? "driving" : shift.status,
+      rescueUsed: wasStranded ? true : shift.rescueUsed,
+      lastEvent: "Sepolia fuel boost applied."
+    },
+    added: fuel - shift.fuel
+  };
+}
+
+export function applyRepairKit(shift, damagePoints = 35) {
+  if (!Number.isFinite(damagePoints) || damagePoints <= 0) throw new Error("Repair kit must restore a positive amount.");
+  const damage = Math.max(0, shift.damage - damagePoints);
+  if (damage === shift.damage) return { shift, repaired: 0 };
+  const wasDisabled = shift.status === "disabled" || shift.damage >= 100;
+  const passengers = wasDisabled
+    ? shift.passengers.map((rider) => rider.state === "waiting" ? rider : { ...rider, state: "waiting" })
+    : shift.passengers;
+  return {
+    shift: {
+      ...shift,
+      damage,
+      status: wasDisabled ? "driving" : shift.status,
+      trip: wasDisabled ? null : shift.trip,
+      passenger: wasDisabled ? null : shift.passenger,
+      passengers,
+      lastEvent: "Sepolia repair kit applied."
+    },
+    repaired: shift.damage - damage
+  };
 }
 
 export function purchaseGarageItem(profile, id) {

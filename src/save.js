@@ -1,7 +1,8 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import { newProfile, SAVE_VERSION } from "./game.js";
 
-export const SAVE_KEY = "morrowline.taxi-save.v6";
+export const SAVE_KEY = "morrowline.taxi-save.v7";
+export const LEGACY_TAXI_V6_SAVE_KEY = "morrowline.taxi-save.v6";
 export const LEGACY_TAXI_V5_SAVE_KEY = "morrowline.taxi-save.v5";
 export const LEGACY_TAXI_V4_SAVE_KEY = "morrowline.taxi-save.v4";
 export const LEGACY_TAXI_SAVE_KEY = "morrowline.taxi-save.v3";
@@ -51,7 +52,8 @@ export function validateProfile(value) {
   if (!Number.isFinite(value.totalMeters) || value.totalMeters < 0 || !Number.isSafeInteger(value.cleanRides) || value.cleanRides < 0) {
     throw new Error("Save file has invalid driving statistics.");
   }
-  if (!value.settings || typeof value.settings.sound !== "boolean" || typeof value.settings.reducedMotion !== "boolean") {
+  if (!value.settings || typeof value.settings.sound !== "boolean" || typeof value.settings.reducedMotion !== "boolean" ||
+      !["standard", "sunset", "tidal"].includes(value.settings.taxiPaint ?? "standard")) {
     throw new Error("Save file has invalid settings.");
   }
   return structuredClone(value);
@@ -77,7 +79,8 @@ function migrateCourierSave(storage) {
   migrated.districtsVisited = migrated.rides > 0 ? [DISTRICTS[0].id] : [];
   migrated.settings = {
     sound: previous.settings?.sound === true,
-    reducedMotion: previous.settings?.reducedMotion === true
+    reducedMotion: previous.settings?.reducedMotion === true,
+    taxiPaint: "standard"
   };
   return migrated;
 }
@@ -146,13 +149,16 @@ function migrateTaxiSave(storage, key, version) {
   migrated.cleanRides = Number.isSafeInteger(previous.cleanRides) && previous.cleanRides >= 0 ? previous.cleanRides : 0;
   migrated.settings = {
     sound: previous.settings?.sound === true,
-    reducedMotion: previous.settings?.reducedMotion === true
+    reducedMotion: previous.settings?.reducedMotion === true,
+    taxiPaint: previous.settings?.taxiPaint === "sunset" || previous.settings?.taxiPaint === "tidal"
+      ? previous.settings.taxiPaint : "standard"
   };
   return migrated;
 }
 
 function loadLegacyProfile(storage) {
-  const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V5_SAVE_KEY, 5) ??
+  const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V6_SAVE_KEY, 6) ??
+    migrateTaxiSave(storage, LEGACY_TAXI_V5_SAVE_KEY, 5) ??
     migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
     migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
     migrateTaxiSave(storage, LEGACY_TAXI_V2_SAVE_KEY, 2) ??

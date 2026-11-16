@@ -1,15 +1,20 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import {
-  acceptRide, advanceShift, availableDistricts, canParkAt, canUnlockDistrict, CITY, createShift,
+  acceptRide, advanceShift, applyFuelBoost, applyRepairKit, availableDistricts, canParkAt, canUnlockDistrict, CITY, createShift,
   distanceTo, dropOffPassenger, findPassenger, formatMoney, getCarStats, getDistrict,
   getStageProgress, isOnRoad, isStageComplete, newProfile, nextFuelStation, purchaseGarageItem, REPAIR_CENTS_PER_DAMAGE, refuel, repairCar,
   roadsideAssistance, takePassenger, unlockDistrict
 } from "./game.js";
 import { exportSave, importSave, loadProfile, saveProfile } from "./save.js";
 import { createRoadRenderer, getMapTransform } from "./renderer.js";
-import { connectWallet, describeWallet, SEPOLIA_EXPLORER, shortenAddress, switchToSepolia, walletStatus } from "./wallet.js";
+import { connectWallet, describeWallet, SEPOLIA_CHAIN_ID, SEPOLIA_EXPLORER, shortenAddress, switchToSepolia, walletStatus } from "./wallet.js";
 import { LEADERBOARD_CONTRACT_ADDRESS } from "./leaderboard-config.js";
 import { estimateProgressSubmission, readLeaderboard, sendProgressSubmission } from "./leaderboard.js";
+import { SHOP_CONTRACT_ADDRESS } from "./shop-config.js";
+import {
+  estimateShopConsumption, estimateShopPurchase, formatEth, readShopInventory,
+  sendShopTransaction, SHOP_ITEMS, verifySepoliaAccount
+} from "./shop.js";
 
 const app = document.querySelector("#app");
 const importFile = document.querySelector("#import-file");
@@ -23,6 +28,11 @@ let leaderboardEntries = [];
 let leaderboardMessage = "";
 let pendingProgress = null;
 let leaderboardLoading = false;
+let shopInventory = new Map();
+let shopMessage = "";
+let shopLoading = false;
+let pendingShop = null;
+let mapZoom = 1;
 let saveWarning = "";
 let tutorialOpen = false;
 let toastTimer;
@@ -37,6 +47,11 @@ try {
 } catch (error) {
   saveWarning = `Tutorial preference could not be read: ${error.message}`;
   tutorialOpen = true;
+}
+
+function getTaxiPaintColor() {
+  return profile.settings.taxiPaint === "sunset" ? "#ef9a56" :
+    profile.settings.taxiPaint === "tidal" ? "#43b6a4" : "#f1c84f";
 }
 
 try {
@@ -257,6 +272,7 @@ function renderDrivingPanel() {
       <canvas id="road-scene" tabindex="0" aria-label="Top-down drone view of the entire neighborhood: roads, homes, traffic, waiting passengers, taxi, and route. Click a person to choose them. Use WASD or arrow keys to drive."></canvas>
       <div class="scene-hud scene-hud-left"><span class="weather-pill"><i></i> CLEAR · DRY STREETS</span><span class="street-pill" id="street-name">${escapeText(streetNameFor({ x: shift.x, y: shift.y }))}</span></div>
       <div class="map-target-chip" id="map-target"><span id="route-symbol">${shift.trip?.status === "to-dropoff" ? "◎" : "⌖"}</span><span><small id="route-type">${shift.trip?.status === "to-pickup" ? "PASSENGER WAITING" : shift.trip?.status === "to-dropoff" ? "DROP-OFF LOCATION" : "SERVICE STATION"}</small><b id="route-distance">${Math.max(0, getTargetDistance())}m</b></span></div>
+      <div class="map-zoom-controls" aria-label="Map zoom controls"><button data-action="map-zoom-out" aria-label="Zoom out">−</button><span id="map-zoom-level">${Math.round(mapZoom * 100)}%</span><button data-action="map-zoom-in" aria-label="Zoom in">+</button></div>
       <div class="speedometer"><strong id="speed">${Math.round(shift.speed)}</strong><span>KM/H</span><small>${district.limit} LIMIT</small><div class="speed-track"><i id="speed-meter"></i></div></div>
       <div class="scene-message" id="scene-message" role="status" aria-live="polite">${escapeText(shift.lastEvent)}</div>
       ${shift.status === "disabled" ? `<div class="stranded-cover disabled-cover"><b>TAXI DISABLED · 100% DAMAGE</b><span>Repair the car before driving. Any active fare will be cancelled.</span><button class="button button-primary" data-action="repair">Repair fully · ${formatMoney(Math.ceil(shift.damage * REPAIR_CENTS_PER_DAMAGE))}</button></div>` :
@@ -286,7 +302,7 @@ function renderRightPanel() {
       <div class="legend-row"><i class="legend-barrier">▨</i><span><b>Roadworks</b><small>${shift.roadworks.length} barriers · steer around closed lanes</small></span></div>
       <div class="legend-row"><i class="legend-coin">✦</i><span><b>Street coins</b><small>Drive over glowing coins to collect</small></span></div>
       <div class="legend-row"><i class="legend-fuel">F</i><span><b>Fuel station</b><small>Stop here to refill</small></span></div>
-      <div class="map-note">The whole neighborhood is visible from above. Streets, crossings, blocks, houses, parks, traffic and curbside passengers are drawn on the live map.</div>
+      <div class="map-note">Zoom in to explore streets and pedestrians; the view follows your taxi. Use the +/− controls or your mouse wheel.</div>
     </section>
     <section class="panel car-panel"><div class="panel-heading"><div><span class="eyebrow">YOUR VEHICLE</span><h2>Morrowline S4</h2></div><span class="car-icon">▰</span></div>
       <div class="vehicle-illustration" aria-hidden="true"><span class="car-shadow"></span><span class="car-body"><i></i><b></b><em></em></span><span class="vehicle-plate">CITY TAXI</span></div>
@@ -317,15 +333,39 @@ function renderRightPanel() {
 
 function renderWalletPanel() {
   const contractReady = /^0x[0-9a-f]{40}$/i.test(LEADERBOARD_CONTRACT_ADDRESS);
+  const shopReady = /^0x[0-9a-f]{40}$/i.test(SHOP_CONTRACT_ADDRESS);
   const rows = leaderboardEntries.length
     ? leaderboardEntries.map((entry, index) => `<div class="leaderboard-row"><span>${index + 1}</span><b>${escapeText(shortenAddress(entry.address))}</b><small>Stage ${entry.highestStage} · ${entry.totalRides} fares</small></div>`).join("")
     : `<p class="leaderboard-empty">${contractReady ? "No drivers have published progress yet." : "The Sepolia contract address will appear here after deployment."}</p>`;
   const maxFeeEth = pendingProgress ? `${(pendingProgress.maxFeeWei / 10n ** 18n).toString()}.${(pendingProgress.maxFeeWei % 10n ** 18n).toString().padStart(18, "0")}` : "";
+  const products = SHOP_ITEMS.map((item) => {
+    const quantity = shopInventory.get(item.id) ?? 0;
+    const ownedPaint = item.kind === "paint" && quantity > 0;
+    const selected = profile.settings.taxiPaint === (item.kind === "paint" ? (item.id === 1 ? "sunset" : "tidal") : "");
+    const action = item.kind === "paint"
+      ? ownedPaint
+        ? `<button class="button button-secondary shop-item-action" data-action="shop-paint" data-id="${item.id}" ${selected ? "disabled" : ""}>${selected ? "In use" : "Use paint"}</button>`
+        : `<button class="button button-secondary shop-item-action" data-action="shop-prepare-purchase" data-id="${item.id}" ${!shopReady || wallet.state !== "connected" || shopLoading ? "disabled" : ""}>Buy · ${formatEth(item.priceWei)} Sepolia ETH</button>`
+      : quantity > 0
+        ? `<button class="button button-secondary shop-item-action" data-action="shop-prepare-use" data-id="${item.id}" ${!shopReady || wallet.state !== "connected" || shopLoading ? "disabled" : ""}>Use · ${quantity} available</button>`
+        : `<button class="button button-secondary shop-item-action" data-action="shop-prepare-purchase" data-id="${item.id}" ${!shopReady || wallet.state !== "connected" || shopLoading ? "disabled" : ""}>Buy · ${formatEth(item.priceWei)} Sepolia ETH</button>`;
+    return `<article class="shop-item"><div><b>${escapeText(item.name)}</b><small>${escapeText(item.description)}</small></div><span class="shop-stock">${item.kind === "paint" ? (ownedPaint ? "OWNED" : "ONE-TIME") : `${quantity} IN STOCK`}</span>${action}</article>`;
+  }).join("");
+  const shopFeeEth = pendingShop ? formatEth(pendingShop.maxFeeWei) : "";
+  const shopPriceEth = pendingShop?.type === "purchase" ? formatEth(pendingShop.priceWei) : "";
+  const defaultShopMessage = !shopReady ? "Shop contract is not deployed/configured yet. Items are inactive until a Sepolia contract address is configured." :
+    wallet.state === "connected" ? "Reading your on-chain item inventory…" : "Connect MetaMask on Sepolia to view your items.";
   return `<section class="wallet-drawer panel" id="wallet-panel" hidden>
     <div class="panel-heading"><div><span class="eyebrow">OPTIONAL SEPOLIA FEATURES</span><h2>Wallet & leaderboard</h2></div><button class="icon-button" data-action="wallet-close" aria-label="Close wallet panel">×</button></div>
     <p class="wallet-description">Play without a wallet. Local Morrow coins and upgrades are not crypto. Publishing progress makes your wallet address and stage/fare totals public on Sepolia and costs test ETH; entries are self-reported.</p>
     <div class="wallet-state-card"><span class="wallet-dot ${wallet.state}"></span><div><b>${wallet.state === "connected" ? `Connected · ${escapeText(shortenAddress(wallet.address))}` : wallet.state === "wrong-network" ? `Wrong network · ${escapeText(shortenAddress(wallet.address))}` : wallet.state === "unavailable" ? "MetaMask not detected" : "Wallet disconnected"}</b><p>${escapeText(walletMessage || wallet.message)}</p></div></div>
     <div class="wallet-actions"><button class="button button-secondary" data-action="wallet-connect" ${wallet.state === "unavailable" ? "disabled" : ""}>Connect MetaMask</button><button class="button button-secondary" data-action="wallet-switch" ${wallet.state === "unavailable" ? "disabled" : ""}>Switch to Sepolia</button></div>
+    <div class="onchain-shop"><div class="leaderboard-heading"><b>SEPOLIA TEST-ETH SHOP</b><span>TEST NETWORK ONLY</span></div>
+      <p class="shop-description">One-time car paint and consumable fuel/repair boosts use Sepolia test ETH. Network gas is additional; review every amount in MetaMask. No real-money payments.</p>
+      ${products}
+      <p class="leaderboard-status" id="shop-status">${escapeText(shopMessage || defaultShopMessage)}</p>
+      ${pendingShop ? `<div class="publish-confirm"><p>${pendingShop.type === "purchase" ? `${escapeText(pendingShop.item.name)} · ${shopPriceEth} Sepolia ETH` : `Use ${escapeText(pendingShop.item.name)}`}<br>Estimated gas fee: <b>up to ${shopFeeEth} Sepolia ETH</b><br>MetaMask shows the final transaction. Nothing is paid until you approve it.</p><button class="button button-primary" data-action="shop-submit">Review in MetaMask</button><button class="text-button" data-action="shop-cancel">Cancel</button></div>` : ""}
+    </div>
     <div class="onchain-board"><div class="leaderboard-heading"><b>TOP DRIVERS · SEPOLIA</b><button class="text-button" data-action="leaderboard-refresh" ${!contractReady || wallet.state !== "connected" || leaderboardLoading ? "disabled" : ""}>${leaderboardLoading ? "Loading…" : "Refresh"}</button></div><div id="leaderboard-list">${rows}</div>
       <p class="leaderboard-status" id="leaderboard-status">${escapeText(leaderboardMessage || (contractReady ? "Scores are written only after you submit and approve a MetaMask transaction." : "Leaderboard contract deployment is not complete."))}</p>
       ${contractReady && wallet.state === "connected" ? `<button class="button button-secondary publish-progress" data-action="leaderboard-estimate" ${profile.rides === 0 || pendingProgress ? "disabled" : ""}>Estimate & publish my progress</button>${pendingProgress ? `<div class="publish-confirm"><p>Stage ${pendingProgress.highestStage} · ${pendingProgress.totalRides} fares<br>Estimated maximum fee: <b>${maxFeeEth} Sepolia ETH</b><br>MetaMask shows the final fee. Progress is public and self-reported.</p><button class="button button-primary" data-action="leaderboard-submit">Review in MetaMask</button><button class="text-button" data-action="leaderboard-cancel">Cancel</button></div>` : ""}` : ""}
@@ -344,9 +384,17 @@ function render() {
     ${renderWalletPanel()}${renderTutorial()}<div class="toast-region" id="toast" role="status" aria-live="polite"></div>`;
   const canvas = document.querySelector("#road-scene");
   const renderer = createRoadRenderer(canvas);
+  renderer.setZoom(mapZoom);
   window.__morrowlineRenderer?.disconnect();
   window.__morrowlineRenderer = renderer;
   canvas.addEventListener("click", onMapClick);
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    mapZoom = Math.max(1, Math.min(2.5, mapZoom + (event.deltaY < 0 ? .15 : -.15)));
+    renderer.setZoom(mapZoom);
+    const zoomLabel = document.querySelector("#map-zoom-level");
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(mapZoom * 100)}%`;
+  }, { passive: false });
   document.querySelector("#wallet-panel").hidden = true;
   document.querySelector(".tutorial-dialog")?.focus();
   return district;
@@ -367,10 +415,10 @@ function onMapClick(event) {
   if (shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff") return;
   const canvas = event.currentTarget;
   const bounds = canvas.getBoundingClientRect();
-  const transform = getMapTransform(bounds.width, bounds.height);
+  const mapTransform = getMapTransform(bounds.width, bounds.height, mapZoom, shift);
   const world = {
-    x: (event.clientX - bounds.left - transform.originX) / transform.scale,
-    y: (event.clientY - bounds.top - transform.originY) / transform.scale
+    x: (event.clientX - bounds.left - mapTransform.originX) / mapTransform.scale,
+    y: (event.clientY - bounds.top - mapTransform.originY) / mapTransform.scale
   };
   const rider = shift.passengers.filter((person) => person.state === "waiting")
     .map((person) => ({ person, distance: distanceTo(world, person) }))
@@ -473,7 +521,7 @@ function frame(now) {
       }
     }
   }
-  window.__morrowlineRenderer?.draw(shift, getDistrict(shift.districtId));
+  window.__morrowlineRenderer?.draw(shift, getDistrict(shift.districtId), getTaxiPaintColor());
   syncHud(now);
   requestAnimationFrame(frame);
 }
@@ -581,6 +629,7 @@ function refuelCab() {
 async function updateWallet(action) {
   walletMessage = "";
   pendingProgress = null;
+  pendingShop = null;
   try {
     wallet = action === "connect" ? await connectWallet(window.ethereum) : await switchToSepolia(window.ethereum);
   } catch (error) {
@@ -589,7 +638,98 @@ async function updateWallet(action) {
   }
   render();
   updateWalletPanel(true);
-  if (wallet.state === "connected") await refreshLeaderboard();
+  if (wallet.state === "connected") {
+    await refreshLeaderboard();
+    await refreshShopInventory();
+  }
+}
+
+async function refreshShopInventory() {
+  if (!/^0x[0-9a-f]{40}$/i.test(SHOP_CONTRACT_ADDRESS) || wallet.state !== "connected" || !window.ethereum?.request) {
+    shopInventory = new Map();
+    return;
+  }
+  shopLoading = true;
+  shopMessage = "Reading your on-chain item inventory…";
+  updateShopPanel();
+  try {
+    shopInventory = await readShopInventory(window.ethereum, SHOP_CONTRACT_ADDRESS, wallet.address);
+    shopMessage = "Sepolia shop inventory loaded. Consumables are applied only after confirmed transactions.";
+  } catch (error) {
+    shopMessage = `Could not read the Sepolia shop inventory: ${error.message}`;
+  } finally {
+    shopLoading = false;
+    updateShopPanel();
+  }
+}
+
+function updateShopPanel() {
+  const panel = document.querySelector("#wallet-panel");
+  if (!panel) return;
+  const status = panel.querySelector("#shop-status");
+  if (status) status.textContent = shopMessage;
+}
+
+async function prepareShopTransaction(type, itemId) {
+  shopMessage = "";
+  pendingShop = null;
+  shopLoading = true;
+  updateShopPanel();
+  try {
+    if (wallet.state !== "connected") throw new Error("Connect MetaMask on Sepolia first.");
+    if (!/^0x[0-9a-f]{40}$/i.test(SHOP_CONTRACT_ADDRESS)) throw new Error("The Sepolia shop is not deployed/configured yet.");
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (chainId !== SEPOLIA_CHAIN_ID) throw new Error("Switch MetaMask to Sepolia before using the shop.");
+    await verifySepoliaAccount(window.ethereum, wallet.address);
+    const item = SHOP_ITEMS.find((candidate) => candidate.id === itemId);
+    if (!item) throw new Error("This shop item is unavailable.");
+    const quantity = shopInventory.get(itemId) ?? 0;
+    if (type === "consume" && quantity < 1) throw new Error("You do not own this consumable.");
+    if (type === "purchase" && item.kind === "paint" && quantity > 0) throw new Error("You already own this one-time paint.");
+    const estimate = type === "purchase"
+      ? await estimateShopPurchase(window.ethereum, SHOP_CONTRACT_ADDRESS, wallet.address, itemId)
+      : await estimateShopConsumption(window.ethereum, SHOP_CONTRACT_ADDRESS, wallet.address, itemId);
+    pendingShop = { ...estimate, type };
+    shopMessage = "Review the item and estimated network fee, then choose Review in MetaMask to request the transaction.";
+  } catch (error) {
+    shopMessage = `Could not prepare shop transaction: ${error.message}`;
+  } finally {
+    shopLoading = false;
+    render();
+    updateWalletPanel(true);
+  }
+}
+
+async function submitShopTransaction() {
+  if (!pendingShop || wallet.state !== "connected") return;
+  const pending = pendingShop;
+  shopLoading = true;
+  shopMessage = "MetaMask will ask you to review the Sepolia transaction. Confirm there only if the details match.";
+  render();
+  updateWalletPanel(true);
+  try {
+    await verifySepoliaAccount(window.ethereum, wallet.address);
+    const { hash } = await sendShopTransaction(window.ethereum, pending.transaction, (submittedHash) => {
+      shopMessage = `Transaction sent: ${submittedHash}. Waiting for Sepolia confirmation…`;
+      updateShopPanel();
+    });
+    if (pending.type === "consume") {
+      if (pending.item.kind === "fuel") shift = applyFuelBoost(shift).shift;
+      if (pending.item.kind === "repair") shift = applyRepairKit(shift).shift;
+      shopMessage = `${pending.item.name} used after confirmed transaction ${hash}.`;
+    } else {
+      shopMessage = `${pending.item.name} purchased after confirmed transaction ${hash}.`;
+    }
+    pendingShop = null;
+    await refreshShopInventory();
+  } catch (error) {
+    pendingShop = null;
+    shopMessage = `Shop transaction was not completed: ${error.message}`;
+  } finally {
+    shopLoading = false;
+    render();
+    updateWalletPanel(true);
+  }
 }
 
 app.addEventListener("click", async (event) => {
@@ -688,7 +828,10 @@ app.addEventListener("click", async (event) => {
     importFile.click();
   } else if (action === "wallet-open") {
     updateWalletPanel(true);
-    if (wallet.state === "connected") refreshLeaderboard();
+    if (wallet.state === "connected") {
+      refreshLeaderboard();
+      refreshShopInventory();
+    }
   } else if (action === "wallet-close") {
     updateWalletPanel(false);
   } else if (action === "wallet-connect") {
@@ -697,6 +840,35 @@ app.addEventListener("click", async (event) => {
     await updateWallet("switch");
   } else if (action === "leaderboard-refresh") {
     await refreshLeaderboard();
+  } else if (action === "map-zoom-in" || action === "map-zoom-out") {
+    mapZoom = Math.max(1, Math.min(2.5, mapZoom + (action === "map-zoom-in" ? .25 : -.25)));
+    window.__morrowlineRenderer?.setZoom(mapZoom);
+    const zoomLabel = document.querySelector("#map-zoom-level");
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(mapZoom * 100)}%`;
+  } else if (action === "shop-prepare-purchase") {
+    await prepareShopTransaction("purchase", Number(button.dataset.id));
+  } else if (action === "shop-prepare-use") {
+    await prepareShopTransaction("consume", Number(button.dataset.id));
+  } else if (action === "shop-submit") {
+    await submitShopTransaction();
+  } else if (action === "shop-cancel") {
+    pendingShop = null;
+    shopMessage = "Shop transaction cancelled. Nothing was sent.";
+    render();
+    updateWalletPanel(true);
+  } else if (action === "shop-paint") {
+    const item = SHOP_ITEMS.find((candidate) => candidate.id === Number(button.dataset.id));
+    if (!item || (shopInventory.get(item.id) ?? 0) < 1) {
+      shopMessage = "That paint is not in your connected Sepolia wallet.";
+      updateShopPanel();
+      return;
+    }
+    profile.settings.taxiPaint = item.id === 1 ? "sunset" : "tidal";
+    persist();
+    render();
+    updateWalletPanel(true);
+    shopMessage = `${item.name} selected.`;
+    updateShopPanel();
   } else if (action === "leaderboard-estimate") {
     try {
       if (wallet.state !== "connected") throw new Error("Connect MetaMask on Sepolia first.");
@@ -825,18 +997,28 @@ if (window.ethereum?.on) {
   window.ethereum.on("accountsChanged", (accounts) => {
     wallet = describeWallet(accounts?.[0] ?? null, wallet.chainId);
     pendingProgress = null;
+    pendingShop = null;
     leaderboardEntries = [];
+    shopInventory = new Map();
     render();
     updateWalletPanel(true);
-    if (wallet.state === "connected") refreshLeaderboard();
+    if (wallet.state === "connected") {
+      refreshLeaderboard();
+      refreshShopInventory();
+    }
   });
   window.ethereum.on("chainChanged", (chainId) => {
     wallet = describeWallet(wallet.address, chainId);
     pendingProgress = null;
+    pendingShop = null;
     leaderboardEntries = [];
+    shopInventory = new Map();
     render();
     updateWalletPanel(true);
-    if (wallet.state === "connected") refreshLeaderboard();
+    if (wallet.state === "connected") {
+      refreshLeaderboard();
+      refreshShopInventory();
+    }
   });
 }
 

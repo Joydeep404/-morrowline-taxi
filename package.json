@@ -9,6 +9,7 @@
     "start": "node scripts/server.mjs --dist",
     "build": "node scripts/build.mjs",
     "compile:contracts": "node scripts/compile-contracts.mjs",
+    "compile:shop": "node scripts/compile-shop.mjs",
     "test": "node --test",
     "test:watch": "node --test --watch"
   },

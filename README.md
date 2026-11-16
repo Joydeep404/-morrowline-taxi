@@ -41,7 +41,7 @@ npm start
 - Fuel is consumed as you drive. Stop near a marked service station and use **F** or **Refuel**. If the tank runs dry, roadside assistance offers a low-cost 5-litre top-up; the charge never exceeds your current balance.
 - Fares are repeatable. A new neighborhood opens after each completed ride, so you can keep earning without a wallet, purchases, ads, or external services.
 
-The map is a custom Canvas illustration with streets, crossings, houses, parks, traffic, the taxi, waiting people, and route markers. It is an overhead 2D game rather than a 3D simulation.
+The map is a custom Canvas illustration with streets, crossings, houses, parks, traffic, roadside pedestrians, three fuel stations, the highlighted taxi, waiting people, and route markers. Use the on-map +/− controls or the mouse wheel to zoom; the view follows the taxi. It is an overhead 2D game rather than a 3D simulation.
 
 ## City and garage
 
@@ -53,15 +53,20 @@ The starting Morrowline S4 comes with a full 48 L tank and $400 in shift funds. 
 
 Cash, Morrow coins, ride history, driver rating, stage objectives, installed equipment, and preferences are stored in this browser. Previous taxi saves and the earlier courier-game save are automatically migrated, retaining compatible progress and preferences; previously earned fares preserve equivalent stage unlocks. Older saves are left untouched. Export a JSON backup in Settings to move progress; Restore Save validates the backup before loading. Browser local storage is not a cloud backup. The first-play tutorial dismissal is remembered separately in this browser.
 
-## Optional Sepolia leaderboard
+## Optional Sepolia features
 
-The game itself is a static website; Sepolia cannot host the web app. MetaMask is optional, and the game remains playable without it. The workspace includes source and UI code for an optional top-ten Sepolia leaderboard, but no contract is deployed or configured. If enabled in a future release, submitted wallet addresses and scores will be public and self-reported. Local Morrow coins and garage upgrades are browser saves, not cryptocurrency. Never share recovery phrases, passwords, private keys, or login codes.
+The game itself is a static website; Sepolia cannot host the web app. MetaMask is optional, and the game remains playable without it. Local Morrow coins and garage upgrades are browser saves, not cryptocurrency.
+
+The optional Sepolia shop accepts **test ETH only**: Sunset/Tidal paint costs 0.00015 ETH once per paint; Fuel Boost and Repair Kit each cost 0.00005 ETH per use. Network gas is additional and shown separately before MetaMask asks for approval. Consumables are applied only after a successful on-chain receipt. The source contract is `contracts/MorrowlineTestnetShop.sol`; the store remains inactive until that contract is deployed to Sepolia and its address is set in `src/shop-config.js`. Purchases are held by the contract and can be withdrawn only by its deployer. Never share recovery phrases, passwords, private keys, or login codes.
+
+The optional top-ten leaderboard source is `contracts/MorrowlineLeaderboard.sol`; no leaderboard contract is deployed or configured. If enabled, submitted wallet addresses and scores are public and self-reported.
 
 ## Test and build
 
-- `npm test` — gameplay, free driving, challenge and entry-permit progression, upgrade- and damage-driven vehicle performance, repair/restart recovery, coin collection, save migration, wallet-state checks, and leaderboard Solidity/ABI behavior.
+- `npm test` — gameplay, free driving, challenge and entry-permit progression, vehicle performance, repair/restart recovery, coins, save migration, map zoom, pedestrians, wallet-state checks, and leaderboard/shop Solidity and transaction behavior.
 - `npm run build` — writes the static application to `dist/`.
 - `npm run compile:contracts` — compiles the optional Solidity leaderboard for Sepolia deployment.
+- `npm run compile:shop` — compiles the Sepolia testnet shop contract to an ignored local artifact.
 - `npm run dev` — local development server.
 - `npm start` — serves the production build.
 
@@ -71,4 +76,4 @@ The app is built from native JavaScript modules, HTML, and CSS. There are no thi
 
 Public play link: [Morrowline Taxi](https://joydeep404.github.io/-morrowline-taxi/).
 
-The GitHub Actions workflow in `.github/workflows/pages.yml` builds and publishes the game to GitHub Pages whenever `main` is updated. The site is separate from Sepolia: a Sepolia contract does not host the game website. No leaderboard contract is deployed or connected.
+The GitHub Actions workflow in `.github/workflows/pages.yml` builds and publishes the game to GitHub Pages whenever `main` is updated. The site is separate from Sepolia: a Sepolia contract does not host the game website. Neither the leaderboard nor the shop contract is deployed or connected by default.

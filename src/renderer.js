@@ -1,4 +1,4 @@
-import { CITY, nextFuelStation } from "./game.js";
+import { CITY, FUEL_STATIONS } from "./game.js";
 
 const PALETTE = {
   grass: "#8b9b79",
@@ -167,6 +167,20 @@ function drawRoads(context, sx, sy, scale, shift) {
   for (const y of CITY.horizontalRoads) {
     context.beginPath(); context.moveTo(sx(0), sy(y)); context.lineTo(sx(CITY.width), sy(y)); context.stroke();
   }
+  context.fillStyle = "rgba(246,239,215,.78)";
+  const stripe = 8 * scale;
+  for (const x of CITY.verticalRoads) {
+    for (const y of CITY.horizontalRoads) {
+      for (const direction of [-1, 1]) {
+        const crossX = sx(x + direction * (CITY.roadWidth / 2 + 11));
+        const crossY = sy(y);
+        for (let mark = -2; mark <= 2; mark += 1) {
+          context.fillRect(crossX - stripe / 2, crossY + mark * stripe * 1.55, stripe, stripe);
+          context.fillRect(crossX + direction * stripe * 1.55 + mark * stripe * .55, crossY - stripe / 2, stripe, stripe);
+        }
+      }
+    }
+  }
   context.strokeStyle = PALETTE.road;
   context.lineWidth = CITY.roadWidth * scale;
   for (const x of CITY.verticalRoads) {
@@ -213,13 +227,25 @@ function drawStreetLabels(context, sx, sy, scale, shift) {
   }
 }
 
-function drawCar(context, point, heading, scale, color, isPlayer = false, model = 0) {
+function drawCar(context, point, heading, scale, color, isPlayer = false, model = 0, animation = 0) {
   const x = point.x, y = point.y;
-  const length = (isPlayer ? 43 : 32 + model * 2) * scale;
-  const width = (isPlayer ? 23 : 17 + model) * scale;
+  const length = Math.max(isPlayer ? 21 : 0, (isPlayer ? 50 : 32 + model * 2) * scale);
+  const width = Math.max(isPlayer ? 12 : 0, (isPlayer ? 27 : 17 + model) * scale);
   context.save();
   context.translate(x, y);
   context.rotate(heading);
+  if (isPlayer) {
+    const pulse = .8 + Math.sin(animation * 3) * .1;
+    context.fillStyle = `rgba(255,230,127,${.18 * pulse})`;
+    context.beginPath();
+    context.arc(0, 0, Math.max(20, 32 * scale), 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(255,245,190,.95)";
+    context.lineWidth = Math.max(1.5, 2 * scale);
+    context.beginPath();
+    context.arc(0, 0, Math.max(13, 23 * scale), 0, Math.PI * 2);
+    context.stroke();
+  }
   context.fillStyle = "rgba(34,39,34,.34)";
   roundedRect(context, -length * .5 + 2 * scale, -width * .5 + 3 * scale, length, width, width * .24);
   context.fill();
@@ -236,16 +262,48 @@ function drawCar(context, point, heading, scale, color, isPlayer = false, model 
   context.fillRect(-length * .5, -width * .3, 3 * scale, 4 * scale);
   context.fillRect(-length * .5, width * .11, 3 * scale, 4 * scale);
   if (isPlayer) {
-    context.fillStyle = "#f4e3a9";
-    context.font = `700 ${Math.max(5, 6 * scale)}px sans-serif`;
+    context.fillStyle = "#fff4bf";
+    context.font = `800 ${Math.max(7, 9 * scale)}px sans-serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText("TAXI", 0, 0);
-    context.strokeStyle = "#fff0bd";
-    context.lineWidth = 2 * scale;
-    context.beginPath(); context.moveTo(length * .5, 0); context.lineTo(length * .5 + 14 * scale, 0); context.stroke();
+    context.fillText("YOU", 0, -Math.max(18, width * .9));
+    context.fillStyle = "#fff7cf";
+    roundedRect(context, -Math.max(3, 5 * scale), -Math.max(8, 11 * scale), Math.max(6, 10 * scale), Math.max(4, 7 * scale), 2 * scale);
+    context.fill();
+    context.fillStyle = "#34464b";
+    context.font = `800 ${Math.max(5, 6 * scale)}px sans-serif`;
+    context.fillText("T", 0, 0);
   }
   context.restore();
+}
+
+function drawWalker(context, person, sx, sy, scale) {
+  const x = sx(person.x), y = sy(person.y);
+  const radius = Math.max(2.4, 4.2 * scale);
+  const step = Math.sin(person.stride) * radius * .55;
+  context.fillStyle = "rgba(30,40,34,.28)";
+  context.beginPath();
+  context.ellipse(x + radius * .3, y + radius * 1.25, radius * 1.2, radius * .55, 0, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = "#33413d";
+  context.lineWidth = Math.max(1.2, radius * .42);
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(x, y + radius * .4);
+  context.lineTo(x - step, y + radius * 1.35);
+  context.moveTo(x, y + radius * .4);
+  context.lineTo(x + step, y + radius * 1.35);
+  context.stroke();
+  context.strokeStyle = person.color;
+  context.lineWidth = Math.max(2, radius * 1.25);
+  context.beginPath();
+  context.moveTo(x, y - radius * .4);
+  context.lineTo(x, y + radius * .65);
+  context.stroke();
+  context.fillStyle = "#f1d0ad";
+  context.beginPath();
+  context.arc(x, y - radius * .9, radius * .42, 0, Math.PI * 2);
+  context.fill();
 }
 
 function drawPassenger(context, person, sx, sy, scale, selected) {
@@ -282,13 +340,17 @@ function drawPassenger(context, person, sx, sy, scale, selected) {
   }
 }
 
-function drawFuelStation(context, station, sx, sy, scale) {
-  if (!station) return;
+function drawFuelStation(context, station, sx, sy, scale, nearest = false) {
   const x = sx(station.x), y = sy(station.y);
-  context.fillStyle = "#eee1b6";
-  context.beginPath(); context.arc(x, y, Math.max(5, 8 * scale), 0, Math.PI * 2); context.fill();
-  context.fillStyle = "#3e5551";
-  context.font = `700 ${Math.max(7, 10 * scale)}px sans-serif`;
+  const radius = Math.max(8, 13 * scale);
+  context.fillStyle = nearest ? "rgba(255,237,164,.36)" : "rgba(205,235,216,.2)";
+  context.beginPath(); context.arc(x, y, radius * 1.8, 0, Math.PI * 2); context.fill();
+  context.fillStyle = nearest ? "#ffe8a0" : "#cce8d3";
+  context.strokeStyle = "#364b48";
+  context.lineWidth = Math.max(1.5, 2 * scale);
+  context.beginPath(); context.arc(x, y, radius, 0, Math.PI * 2); context.fill(); context.stroke();
+  context.fillStyle = "#263d3d";
+  context.font = `800 ${Math.max(9, 12 * scale)}px sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText("F", x, y);
@@ -386,6 +448,7 @@ export function createRoadRenderer(canvas) {
   let width = 0;
   let height = 0;
   let animation = 0;
+  let zoom = 1;
   const observer = new ResizeObserver(() => {
     const bounds = canvas.getBoundingClientRect();
     pixelRatio = Math.min(2, window.devicePixelRatio || 1);
@@ -397,24 +460,32 @@ export function createRoadRenderer(canvas) {
   });
   observer.observe(canvas);
 
-  function draw(shift, district) {
+  function draw(shift, district, taxiColor = "#e7b94f") {
     if (!width || !height) return;
     animation += 1 / 60;
-    const { padding, scale, originX, originY, drawnWidth, drawnHeight, sx, sy } = getMapTransform(width, height);
+    const { padding, scale, originX, originY, drawnWidth, drawnHeight, sx, sy } =
+      getMapTransform(width, height, zoom, shift);
 
     drawBackground(context, width, height);
     context.save();
-    roundedRect(context, originX, originY, drawnWidth, drawnHeight, Math.max(3, 7 * scale));
+    context.beginPath();
+    context.rect(0, 0, width, height);
     context.clip();
     drawBlocks(context, sx, sy, scale, shift, district);
     drawRoads(context, sx, sy, scale, shift);
     drawRoadworks(context, shift.roadworks, sx, sy, scale);
     drawRoute(context, shift, sx, sy, scale);
-    const station = nextFuelStation(shift);
-    drawFuelStation(context, station, sx, sy, scale);
+    const station = FUEL_STATIONS.reduce((nearest, candidate) =>
+      Math.hypot(candidate.x - shift.x, candidate.y - shift.y) <
+      Math.hypot(nearest.x - shift.x, nearest.y - shift.y) ? candidate : nearest
+    );
+    for (const fuelStation of FUEL_STATIONS) {
+      drawFuelStation(context, fuelStation, sx, sy, scale, fuelStation.id === station.id);
+    }
     drawCoins(context, shift.coins, sx, sy, scale);
     const waiting = shift.passengers.filter((person) => person.state === "waiting" || person.state === "reserved");
     for (const person of waiting) drawPassenger(context, person, sx, sy, scale, person.state === "reserved");
+    for (const walker of shift.walkers ?? []) drawWalker(context, walker, sx, sy, scale);
     for (const car of shift.traffic) {
       const point = { x: sx(car.x), y: sy(car.y) };
       const heading = car.axis === "horizontal"
@@ -423,12 +494,14 @@ export function createRoadRenderer(canvas) {
       drawCar(context, point, heading, scale, car.color, false, car.model);
     }
     const screenPosition = { x: sx(shift.x), y: sy(shift.y) };
-    drawCar(context, screenPosition, shift.heading, scale, "#c8a265", true);
+    drawCar(context, screenPosition, shift.heading, scale, taxiColor, true, 0, animation);
     context.restore();
     context.strokeStyle = "rgba(233,220,191,.45)";
     context.lineWidth = 1;
-    roundedRect(context, originX, originY, drawnWidth, drawnHeight, Math.max(3, 7 * scale));
-    context.stroke();
+    if (zoom <= 1) {
+      roundedRect(context, originX, originY, drawnWidth, drawnHeight, Math.max(3, 7 * scale));
+      context.stroke();
+    }
     drawNorth(context, width - padding - 19, padding + 28);
     if (shift.status === "stranded") {
       context.fillStyle = "rgba(12,21,24,.34)";
@@ -436,16 +509,25 @@ export function createRoadRenderer(canvas) {
     }
   }
 
-  return { draw, disconnect: () => observer.disconnect() };
+  function setZoom(value) {
+    zoom = Math.max(1, Math.min(2.5, Number.isFinite(value) ? value : 1));
+    return zoom;
+  }
+
+  return { draw, setZoom, getZoom: () => zoom, disconnect: () => observer.disconnect() };
 }
 
-export function getMapTransform(width, height) {
+export function getMapTransform(width, height, zoom = 1, focus = null) {
   const padding = Math.min(22, width * .025);
-  const scale = Math.min((width - padding * 2) / CITY.width, (height - padding * 2) / CITY.height);
+  const baseScale = Math.min((width - padding * 2) / CITY.width, (height - padding * 2) / CITY.height);
+  const clampedZoom = Math.max(1, Math.min(2.5, Number.isFinite(zoom) ? zoom : 1));
+  const scale = baseScale * clampedZoom;
   const drawnWidth = CITY.width * scale;
   const drawnHeight = CITY.height * scale;
-  const originX = (width - drawnWidth) / 2;
-  const originY = (height - drawnHeight) / 2;
+  const originX = clampedZoom <= 1 ? (width - drawnWidth) / 2 :
+    drawnWidth <= width ? (width - drawnWidth) / 2 : Math.max(width - drawnWidth, Math.min(0, width / 2 - (focus?.x ?? CITY.width / 2) * scale));
+  const originY = clampedZoom <= 1 ? (height - drawnHeight) / 2 :
+    drawnHeight <= height ? (height - drawnHeight) / 2 : Math.max(height - drawnHeight, Math.min(0, height / 2 - (focus?.y ?? CITY.height / 2) * scale));
   return {
     padding, scale, originX, originY, drawnWidth, drawnHeight,
     sx: (x) => originX + x * scale,
