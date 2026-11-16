@@ -1,9 +1,9 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import {
-  acceptRide, advanceShift, availableDistricts, canParkAt, CITY, createShift,
+  acceptRide, advanceShift, availableDistricts, canParkAt, canUnlockDistrict, CITY, createShift,
   distanceTo, dropOffPassenger, findPassenger, formatMoney, getCarStats, getDistrict,
   getStageProgress, isOnRoad, isStageComplete, newProfile, nextFuelStation, purchaseGarageItem, REPAIR_CENTS_PER_DAMAGE, refuel, repairCar,
-  roadsideAssistance, takePassenger
+  roadsideAssistance, takePassenger, unlockDistrict
 } from "./game.js";
 import { exportSave, importSave, loadProfile, saveProfile } from "./save.js";
 import { createRoadRenderer, getMapTransform } from "./renderer.js";
@@ -94,6 +94,14 @@ function getTarget() {
   return { type: "fuel", point: nextFuelStation(shift), label: "Service station" };
 }
 
+function getDriveStatus() {
+  if (shift.status === "disabled") return "VEHICLE DISABLED";
+  if (shift.status === "stranded") return "ROADSIDE STOP";
+  if (shift.trip?.status === "to-dropoff") return "FARE IN PROGRESS";
+  if (shift.trip?.status === "to-pickup") return "DRIVING TO PICKUP";
+  return "FREE DRIVE";
+}
+
 function getTargetDistance() {
   return Math.round(distanceTo(shift, getTarget().point));
 }
@@ -132,7 +140,7 @@ function getActionText() {
       return `Accept ${person.name}'s pickup`;
     }
   }
-  return "Select a waiting passenger";
+  return "Free drive · choose a rider for a fare";
 }
 
 function renderHeader() {
@@ -163,7 +171,8 @@ function renderTutorial() {
         <li><b>Choose a rider.</b><span>Click a person on the city map or select a name in Available Riders, then accept the pickup.</span></li>
         <li><b>Pick up and drop off.</b><span>Follow the gold route to the curb. Stop within 48 m and press Space. Follow the green route, park near the destination, and press Space again.</span></li>
         <li><b>Drive carefully.</b><span>W / ↑ accelerates, S / ↓ brakes, A/D or ←/→ steers, and R reverses. Avoid traffic, barriers, and grass.</span></li>
-        <li><b>Complete each neighborhood task.</b><span>Finish fares, deliver on time, and drive over glowing coins to unlock the next stage and buy upgrades.</span></li>
+        <li><b>Free drive or take a fare.</b><span>Drive any time with W / ↑. Choose a rider whenever you want a fare; complete the neighborhood challenge and pay its entry permit from driver earnings to move on.</span></li>
+        <li><b>Spend your rewards wisely.</b><span>Collect glowing coins and earn 2 coins for each on-time fare. Use coins for garage upgrades; driver earnings pay fuel, repairs, and the next neighborhood permit.</span></li>
         <li><b>Look after your taxi.</b><span>Refuel at an F station. Damage reduces speed and handling; at 100% the taxi stops until repaired. If you cannot afford a full repair, the current district restarts and its task progress resets, but your remaining cash and upgrades stay.</span></li>
       </ol>
       <button class="button button-primary full-button" data-action="tutorial-close">Got it — start driving</button>
@@ -209,8 +218,14 @@ function renderDistrictPanel() {
     <div class="district-list">${DISTRICTS.map((district, index) => {
       const unlocked = availableDistricts(profile).some((item) => item.id === district.id);
       const visited = profile.districtsVisited.includes(district.id);
-      return `<button class="district-card ${selectedDistrict === district.id ? "selected" : ""} ${unlocked ? "" : "locked"}" data-action="district" data-id="${district.id}" ${unlocked && canChangeDistrict() ? "" : "disabled"}>
-        <span class="district-numeral">${visited ? "✓" : unlocked ? `0${index + 1}` : "⌑"}</span><span class="district-copy"><b>${escapeText(district.name)}</b><small>${escapeText(district.subtitle)} · ${escapeText(district.difficulty)}</small></span><span class="district-state">${visited ? "VISITED" : unlocked ? `${district.roadworks.length} WORKS` : "LOCKED"}</span>
+      const previousDistrict = DISTRICTS[index - 1];
+      const challengeReady = index > 0 && isStageComplete(profile, previousDistrict.id);
+      const canUnlock = !unlocked && canUnlockDistrict(profile, district.id);
+      const shortfall = Math.max(0, district.entryFeeCents - profile.cashCents);
+      const state = visited ? "VISITED" : unlocked ? `${district.roadworks.length} WORKS` :
+        challengeReady ? shortfall ? `NEED ${formatMoney(shortfall)}` : `UNLOCK ${formatMoney(district.entryFeeCents)}` : "CHALLENGE";
+      return `<button class="district-card ${selectedDistrict === district.id ? "selected" : ""} ${unlocked ? "" : "locked"}" data-action="${canUnlock ? "unlock-district" : "district"}" data-id="${district.id}" ${canChangeDistrict() && (unlocked || canUnlock) ? "" : "disabled"}>
+        <span class="district-numeral">${visited ? "✓" : unlocked ? `0${index + 1}` : "⌑"}</span><span class="district-copy"><b>${escapeText(district.name)}</b><small>${escapeText(district.subtitle)} · ${escapeText(district.difficulty)}</small></span><span class="district-state">${escapeText(state)}</span>
       </button>`;
     }).join("")}</div>
     <div class="stage-objective"><div class="objective-heading"><b>STAGE ${DISTRICTS.indexOf(district) + 1} TASK</b><span>${progress.fares >= objective.fares && progress.onTimeFares >= objective.onTimeFares && progress.coins >= objective.coins ? "COMPLETE" : "IN PROGRESS"}</span></div>
@@ -219,7 +234,7 @@ function renderDistrictPanel() {
       <div class="objective-row"><span>Collect street coins</span><b id="task-coins">${Math.min(progress.coins, objective.coins)} / ${objective.coins}</b></div>
       <small>Drive over the glowing coins while completing fares. On-time rides also earn 2 coins.</small>
     </div>
-    <p class="side-note">Complete this task to unlock the next neighborhood. Passengers wait visibly beside the roads.</p>
+    <p class="side-note">Complete this challenge, then pay the next neighborhood's entry permit with driver earnings. Collectible Morrow coins buy garage upgrades. Free drive is always available in unlocked areas.</p>
   </section>
   <section class="panel shift-card"><div class="panel-heading"><div><span class="eyebrow">YOUR SHIFT</span><h2>Taxi meter</h2></div><span class="shift-icon">◷</span></div>
     <div class="shift-stat"><span>Distance driven</span><b id="odometer">${(shift.distance / 1000).toFixed(2)} km</b></div><div class="shift-stat"><span>Fares finished</span><b id="shift-fares">${shift.tripCount}</b></div><div class="shift-stat"><span>Car condition</span><b id="car-condition">${Math.max(0, 100 - shift.damage).toFixed(0)}%</b></div>
@@ -237,7 +252,7 @@ function renderDrivingPanel() {
   const district = getDistrict(shift.districtId);
   const target = getTarget();
   return `<section class="panel driving-panel">
-    <div class="drive-topline"><div><span class="eyebrow">LIVE DRONE VIEW · STAGE ${DISTRICTS.indexOf(district) + 1} · ${escapeText(district.difficulty)} · ${formatClock(shift.clockMinutes)}</span><h1>${escapeText(district.name)}</h1></div>    <div class="shift-live"><i></i><span id="drive-status">${shift.status === "disabled" ? "VEHICLE DISABLED" : shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT"}</span></div></div>
+    <div class="drive-topline"><div><span class="eyebrow">LIVE DRONE VIEW · STAGE ${DISTRICTS.indexOf(district) + 1} · ${escapeText(district.difficulty)} · ${formatClock(shift.clockMinutes)}</span><h1>${escapeText(district.name)}</h1></div>    <div class="shift-live"><i></i><span id="drive-status">${getDriveStatus()}</span></div></div>
     <div class="scene-wrap">
       <canvas id="road-scene" tabindex="0" aria-label="Top-down drone view of the entire neighborhood: roads, homes, traffic, waiting passengers, taxi, and route. Click a person to choose them. Use WASD or arrow keys to drive."></canvas>
       <div class="scene-hud scene-hud-left"><span class="weather-pill"><i></i> CLEAR · DRY STREETS</span><span class="street-pill" id="street-name">${escapeText(streetNameFor({ x: shift.x, y: shift.y }))}</span></div>
@@ -267,7 +282,7 @@ function renderRightPanel() {
     <section class="panel map-legend-panel"><div class="panel-heading"><div><span class="eyebrow">LIVE CITY MAP</span><h2>Reading the streets</h2></div><span class="route-compass">⌖</span></div>
       <div class="legend-row"><i class="legend-taxi">▰</i><span><b>Your taxi</b><small>Rotates with the steering</small></span></div>
       <div class="legend-row"><i class="legend-rider">♟</i><span><b>Waiting people</b><small>Click one to accept a pickup</small></span></div>
-      <div class="legend-row"><i class="legend-route">┈</i><span><b>Route line</b><small>Gold to pickup · green to destination</small></span></div>
+      <div class="legend-row"><i class="legend-route">┈</i><span><b>Route line</b><small>Gold to pickup · green to destination · no route in free drive</small></span></div>
       <div class="legend-row"><i class="legend-barrier">▨</i><span><b>Roadworks</b><small>${shift.roadworks.length} barriers · steer around closed lanes</small></span></div>
       <div class="legend-row"><i class="legend-coin">✦</i><span><b>Street coins</b><small>Drive over glowing coins to collect</small></span></div>
       <div class="legend-row"><i class="legend-fuel">F</i><span><b>Fuel station</b><small>Stop here to refill</small></span></div>
@@ -400,7 +415,7 @@ function syncHud(now) {
   set("car-condition", `${Math.max(0, 100 - shift.damage).toFixed(0)}%`);
   set("right-condition", `${Math.max(0, 100 - shift.damage).toFixed(0)}%`);
   set("right-fuel", `${shift.fuel.toFixed(1)} L`);
-  set("drive-status", shift.status === "disabled" ? "VEHICLE DISABLED" : shift.status === "stranded" ? "ROADSIDE STOP" : shift.trip?.status === "to-dropoff" ? "FARE IN PROGRESS" : shift.trip?.status === "to-pickup" ? "DRIVING TO PICKUP" : "ON SHIFT");
+  set("drive-status", getDriveStatus());
   set("right-top-speed", `${Math.round(getCarStats(profile, shift.damage).maxSpeed)} km/h`);
   const deadline = document.getElementById("fare-deadline");
   if (deadline) {
@@ -429,7 +444,7 @@ function syncHud(now) {
 function frame(now) {
   const delta = lastFrame ? Math.min(.06, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  if (!tutorialOpen && shift.status === "driving" && shift.trip?.status !== "complete" && !shift.closed) {
+  if (!tutorialOpen && shift.status === "driving" && !shift.closed) {
     const controls = {
       accelerate: heldControls.has("accelerate"),
       brake: heldControls.has("brake") || heldControls.has("reverse"),
@@ -545,7 +560,7 @@ function performObjective() {
     return;
   }
   if (!selectedPassengerId) {
-    showToast("Click a waiting person on the city map or choose their name, then accept the pickup.");
+    showToast("Free drive is active. Select a waiting passenger whenever you want to start a fare.");
     return;
   }
   const result = acceptRide(shift, profile, Math.random, selectedPassengerId);
@@ -593,6 +608,28 @@ app.addEventListener("click", async (event) => {
     shift.damage = previous.damage;
     selectedPassengerId = null;
     render();
+  } else if (action === "unlock-district") {
+    if (!canChangeDistrict()) {
+      showToast("Finish the current fare and park before changing neighborhoods.");
+      return;
+    }
+    const district = getDistrict(button.dataset.id);
+    if (!district || !window.confirm(`Pay ${formatMoney(district.entryFeeCents)} from driver earnings to unlock ${district.name}?`)) return;
+    const result = unlockDistrict(profile, district.id);
+    if (!result.ok) {
+      showToast(result.message);
+      return;
+    }
+    const previous = shift;
+    profile = result.profile;
+    selectedDistrict = button.dataset.id;
+    shift = createShift(profile, selectedDistrict);
+    shift.fuel = Math.min(shift.maxFuel, previous.fuel);
+    shift.damage = previous.damage;
+    selectedPassengerId = null;
+    persist();
+    render();
+    showToast(result.message);
   } else if (action === "select-passenger") {
     if (shift.trip?.status === "to-pickup" || shift.trip?.status === "to-dropoff") return;
     selectedPassengerId = button.dataset.id;

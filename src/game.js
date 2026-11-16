@@ -1,6 +1,6 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const STARTING_CASH_CENTS = 40_000;
 export const STARTING_FUEL = 48;
 export const BASE_FUEL_CAPACITY = 48;
@@ -42,7 +42,48 @@ export function isStageComplete(profile, districtId) {
 }
 
 export function availableDistricts(profile) {
-  return DISTRICTS.filter((district, index) => index === 0 || isStageComplete(profile, DISTRICTS[index - 1].id));
+  const unlocked = new Set(profile.districtsUnlocked ?? [DISTRICTS[0].id]);
+  return DISTRICTS.filter((district) => unlocked.has(district.id));
+}
+
+export function canUnlockDistrict(profile, districtId) {
+  const index = DISTRICTS.findIndex((district) => district.id === districtId);
+  if (index <= 0 || availableDistricts(profile).some((district) => district.id === districtId)) return false;
+  const district = DISTRICTS[index];
+  return availableDistricts(profile).some((item) => item.id === DISTRICTS[index - 1].id) &&
+    isStageComplete(profile, DISTRICTS[index - 1].id) &&
+    profile.cashCents >= district.entryFeeCents;
+}
+
+export function unlockDistrict(profile, districtId) {
+  const index = DISTRICTS.findIndex((district) => district.id === districtId);
+  if (index <= 0) return { profile, ok: false, message: "That neighborhood cannot be unlocked yet." };
+  const district = DISTRICTS[index];
+  if (availableDistricts(profile).some((item) => item.id === districtId)) {
+    return { profile, ok: false, message: `${district.name} is already unlocked.` };
+  }
+  if (!availableDistricts(profile).some((item) => item.id === DISTRICTS[index - 1].id)) {
+    return { profile, ok: false, message: `Unlock ${DISTRICTS[index - 1].name} first.` };
+  }
+  if (!isStageComplete(profile, DISTRICTS[index - 1].id)) {
+    return { profile, ok: false, message: `Complete the ${DISTRICTS[index - 1].name} challenge first.` };
+  }
+  if (profile.cashCents < district.entryFeeCents) {
+    return {
+      profile,
+      ok: false,
+      message: `You need ${formatMoney(district.entryFeeCents - profile.cashCents)} more in driver earnings for the ${district.name} entry permit.`
+    };
+  }
+  return {
+    profile: {
+      ...profile,
+      cashCents: profile.cashCents - district.entryFeeCents,
+      districtsUnlocked: [...(profile.districtsUnlocked ?? [DISTRICTS[0].id]), districtId]
+    },
+    ok: true,
+    message: `${district.name} entry permit paid for ${formatMoney(district.entryFeeCents)}.`
+  };
 }
 
 export function getCarStats(profile, damage = 0) {
@@ -173,6 +214,7 @@ export function newProfile() {
     bestRating: 4.8,
     upgrades: [],
     settings: { sound: false, reducedMotion: false },
+    districtsUnlocked: [DISTRICTS[0].id],
     districtsVisited: [],
     stageProgress: newStageProgress(),
     totalMeters: 0,
@@ -193,7 +235,7 @@ export function createShift(profile, districtId, random = Math.random) {
   if (!district) throw new Error(`Unknown district: ${districtId}`);
   if (!availableDistricts(profile).some((item) => item.id === districtId)) throw new Error("This district is not open yet.");
   const shift = {
-    status: "idle",
+    status: "driving",
     districtId,
     x: CITY.verticalRoads[1],
     y: CITY.horizontalRoads[2],
@@ -221,8 +263,8 @@ export function createShift(profile, districtId, random = Math.random) {
     stranded: false,
     rescueUsed: false,
     serviceNearby: false,
-    lastMessage: "Your shift is ready. Choose one of the visible waiting passengers and drive to their pickup spot.",
-    lastEvent: "Welcome aboard. Passengers are waiting at the marked curbs.",
+    lastMessage: "Free drive is ready. Explore the neighborhood, collect street coins, or choose a passenger for a fare.",
+    lastEvent: "Free drive is active. Passengers are waiting at the marked curbs.",
     randomSeed: Math.floor(random() * 2_000_000_000) || 98765,
     fareTotalCents: 0,
     tripCount: 0,
@@ -423,8 +465,8 @@ export function dropOffPassenger(shift, profile) {
     passenger: null,
     fareTotalCents: shift.fareTotalCents + result.fareCents,
     tripCount: shift.tripCount + 1,
-    lastMessage: `${passenger.name} gets out at ${passenger.destination}. Fare ${formatMoney(result.fareCents)}${result.late ? " — late delivery, reduced fare." : ` · +${coinReward} coins`}${stageCleared ? ` Stage cleared${nextDistrict ? ` — ${nextDistrict.name} unlocked` : " — all stages complete"}!` : "."}`,
-    lastEvent: stageCleared ? `${shift.districtId === DISTRICTS.at(-1).id ? "Final stage complete" : "Stage objective complete"} · ${result.rating.toFixed(1)} ★` :
+    lastMessage: `${passenger.name} gets out at ${passenger.destination}. Fare ${formatMoney(result.fareCents)}${result.late ? " — late delivery, reduced fare." : ` · +${coinReward} coins`}${stageCleared ? nextDistrict ? ` Challenge complete — earn ${formatMoney(nextDistrict.entryFeeCents)} for the ${nextDistrict.name} entry permit.` : " Final challenge complete — all stages finished!" : "."}`,
+    lastEvent: stageCleared ? `${shift.districtId === DISTRICTS.at(-1).id ? "Final stage complete" : "Stage challenge complete"} · ${result.rating.toFixed(1)} ★` :
       result.late ? `Late fare complete · ${result.rating.toFixed(1)} ★ · reduced pay` : `Fare complete · +${coinReward} coins · ${result.rating.toFixed(1)} ★`,
     currentRideRating: result.rating,
     trip: { ...shift.trip, status: "complete", rating: result.rating, fareCents: result.fareCents, safe: safeRide }

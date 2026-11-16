@@ -42,6 +42,7 @@ test("leaderboard calldata reports the highest unlocked stage and ride total", (
     onTimeFares: DISTRICTS[0].objective.onTimeFares,
     coins: DISTRICTS[0].objective.coins
   };
+  profile.districtsUnlocked.push(DISTRICTS[1].id);
   assert.deepEqual(getProgressSubmission(profile), { highestStage: 2, totalRides: 7 });
   assert.equal(
     encodeProgressSubmission(profile),
@@ -91,4 +92,3 @@ test("progress fee estimation prepares but never sends a transaction", async () 
   assert.equal(estimate.transaction.to, contractAddress);
   assert.equal(calls.some(({ method }) => method === "eth_sendTransaction"), false);
 });
-

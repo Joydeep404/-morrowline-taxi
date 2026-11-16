@@ -3,7 +3,7 @@ export const DISTRICTS = [
     id: "old-town", name: "Old Town", subtitle: "Narrow streets & corner shops",
     description: "Start with familiar blocks, steady traffic, and a couple of easy-to-spot roadworks.",
     color: "#bc9a71", rideMeters: [900, 1450], fareCentsPerKm: 245, limit: 50, houses: "brick",
-    difficulty: "Rookie", deadlineFactor: 1.65, trafficCount: 18,
+    difficulty: "Rookie", deadlineFactor: 1.65, trafficCount: 18, entryFeeCents: 0,
     objective: { fares: 2, onTimeFares: 1, coins: 1 },
     roadworks: [
       { x: 750, y: 470, axis: "vertical" },
@@ -14,7 +14,7 @@ export const DISTRICTS = [
     id: "maple-heights", name: "Maple Heights", subtitle: "Quiet residential avenues",
     description: "Residential streets add more roadworks and a tighter delivery window.",
     color: "#91a47e", rideMeters: [1200, 1950], fareCentsPerKm: 265, limit: 45, houses: "suburb",
-    difficulty: "Novice", deadlineFactor: 1.5, trafficCount: 21,
+    difficulty: "Novice", deadlineFactor: 1.5, trafficCount: 21, entryFeeCents: 5_000,
     objective: { fares: 2, onTimeFares: 1, coins: 3 },
     roadworks: [
       { x: 1060, y: 470, axis: "vertical" },
@@ -26,7 +26,7 @@ export const DISTRICTS = [
     id: "riverside", name: "Riverside", subtitle: "The long way by the water",
     description: "Longer waterfront fares, heavier traffic, and several lane closures.",
     color: "#7fa7a9", rideMeters: [1500, 2300], fareCentsPerKm: 295, limit: 60, houses: "river",
-    difficulty: "Skilled", deadlineFactor: 1.38, trafficCount: 24,
+    difficulty: "Skilled", deadlineFactor: 1.38, trafficCount: 24, entryFeeCents: 10_000,
     objective: { fares: 3, onTimeFares: 2, coins: 4 },
     roadworks: [
       { x: 1370, y: 470, axis: "vertical" },
@@ -39,7 +39,7 @@ export const DISTRICTS = [
     id: "market-district", name: "Market District", subtitle: "Crowds, storefronts & signals",
     description: "Dense traffic and five work zones demand careful lane changes and quick pickups.",
     color: "#c49671", rideMeters: [1300, 2150], fareCentsPerKm: 330, limit: 40, houses: "market",
-    difficulty: "Expert", deadlineFactor: 1.28, trafficCount: 28,
+    difficulty: "Expert", deadlineFactor: 1.28, trafficCount: 28, entryFeeCents: 17_500,
     objective: { fares: 3, onTimeFares: 2, coins: 5 },
     roadworks: [
       { x: 1370, y: 710, axis: "vertical" },
@@ -53,7 +53,7 @@ export const DISTRICTS = [
     id: "airport-road", name: "Airport Road", subtitle: "Express lanes & terminal hotels",
     description: "The longest fares, busiest traffic, six construction zones, and the shortest deadline cushion.",
     color: "#a6a7bd", rideMeters: [1900, 2900], fareCentsPerKm: 375, limit: 75, houses: "airport",
-    difficulty: "Master", deadlineFactor: 1.18, trafficCount: 32,
+    difficulty: "Master", deadlineFactor: 1.18, trafficCount: 32, entryFeeCents: 25_000,
     objective: { fares: 4, onTimeFares: 3, coins: 6 },
     roadworks: [
       { x: 1370, y: 950, axis: "vertical" },

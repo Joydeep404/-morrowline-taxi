@@ -2,6 +2,8 @@
 
 Take the wheel in a procedurally illustrated neighborhood-driving game. The entire city is shown from a drone-like overhead view: find visible people waiting at the curb, drive to a selected passenger, stop nearby so they can board, then take them to their destination.
 
+You can also free-drive in any unlocked neighborhood without selecting a passenger.
+
 ## Run locally
 
 Requirements: Node.js 20 or newer. The game has no install-time or runtime packages.
@@ -28,11 +30,12 @@ npm start
 - Follow the green route, then park by the destination and press **Space** to finish the fare.
 - Every fare has a live deadline. Late deliveries are still completable, but reduce your pay and rating.
 - Accelerate with **W** or **↑**; brake with **S** or **↓**. Holding reverse after stopping backs the taxi up.
+- Free drive is always available in your current neighborhood. Explore, collect street coins, and decide when to accept a fare.
 - Steer with **A/D**, **←/→**, or the on-screen steer controls. Hold the on-screen gas, brake, and reverse pedals on touch devices.
 - Each neighborhood has a different deadline, traffic load, and number of roadwork barriers. Steer around the striped barriers; collisions damage the taxi and hurt your rating.
-- Each stage has its own checklist: finish fares, meet on-time targets, and collect glowing coins from the streets. Completing the checklist unlocks the next neighborhood.
+- Each stage has its own checklist: finish fares, meet on-time targets, and collect glowing coins from the streets. After completing it, pay a one-time entry permit from driver earnings to unlock the next neighborhood: Maple Heights $50, Riverside $100, Market District $175, and Airport Road $250. Replay fares to earn more if needed.
 - A first-shift tutorial explains passenger pickups, driving controls, objectives, fuel, and repairs. Reopen it any time with **Instructions**.
-- On-time fares earn 2 Morrow coins. Drive over the gold coin markers to collect more; spend coins on garage upgrades.
+- On-time fares earn 2 Morrow coins. Drive over the gold coin markers to collect more; spend coins on garage upgrades. Driver earnings pay fuel, repairs, and neighborhood entry permits.
 - The displayed street speed limit, smooth braking, and collision-free driving affect passenger ratings and tips.
 - Collisions and off-road driving damage the taxi. Damage reduces acceleration, top speed, and handling; at 100% damage the taxi stops until fully repaired. A full repair costs $110. If remaining cash is below the repair cost, the current district restarts with a repaired car and its objective progress reset; cash, upgrades, and other districts' progress are kept.
 - Fuel is consumed as you drive. Stop near a marked service station and use **F** or **Refuel**. If the tank runs dry, roadside assistance offers a low-cost 5-litre top-up; the charge never exceeds your current balance.
@@ -42,7 +45,7 @@ The map is a custom Canvas illustration with streets, crossings, houses, parks, 
 
 ## City and garage
 
-Old Town opens first, followed by Maple Heights, Riverside, Market District, and Airport Road when the previous stage's fare, on-time, and coin checklist is complete. Each stage adds traffic and roadworks while narrowing the deadline cushion. Neighborhoods also set their own speed limits, fare rates, and route lengths.
+Old Town opens first. Complete each neighborhood's fare, on-time, and coin checklist, then pay its entry permit from driver earnings to enter the next neighborhood. Entry permits are $50 for Maple Heights, $100 for Riverside, $175 for Market District, and $250 for Airport Road. Free-drive and repeat fares in an unlocked neighborhood to earn more. Each stage adds traffic and roadworks while narrowing the deadline cushion. Neighborhoods also set their own speed limits, fare rates, and route lengths.
 
 The starting Morrowline S4 comes with a full 48 L tank and $400 in shift funds. Earnings and Morrow coins persist locally between sessions. A fare adds base pay, a distance component, and possible service/comfort tips. Fuel costs $1.85/L; the starter car consumes more fuel than an Economy Tune, and the Long-Range Tank adds 20 L. The starter taxi tops out at 61 km/h; the Performance Engine raises that to 82 km/h. Other upgrades include All-Weather Tyres and Comfort Cabin. Garage purchases use Morrow coins, show their cost and effect before confirmation, and cannot overdraw the coin balance.
 
@@ -56,7 +59,7 @@ The game itself is a static website; Sepolia cannot host the web app. MetaMask i
 
 ## Test and build
 
-- `npm test` — gameplay, stage objective gates, upgrade- and damage-driven vehicle performance, repair/restart recovery, coin collection, save migration, wallet-state checks, and leaderboard Solidity/ABI behavior.
+- `npm test` — gameplay, free driving, challenge and entry-permit progression, upgrade- and damage-driven vehicle performance, repair/restart recovery, coin collection, save migration, wallet-state checks, and leaderboard Solidity/ABI behavior.
 - `npm run build` — writes the static application to `dist/`.
 - `npm run compile:contracts` — compiles the optional Solidity leaderboard for Sepolia deployment.
 - `npm run dev` — local development server.

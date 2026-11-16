@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DISTRICTS, GARAGE_ITEMS } from "../src/districts.js";
 import {
-  acceptRide, advanceShift, availableDistricts, createShift, dropOffPassenger,
+  acceptRide, advanceShift, availableDistricts, canUnlockDistrict, createShift, dropOffPassenger,
   formatMoney, getCarStats, isParkedAtObjective, newProfile, nextFuelStation, purchaseGarageItem,
-  rateRide, refuel, repairCar, roadsideAssistance, takePassenger
+  rateRide, refuel, repairCar, roadsideAssistance, takePassenger, unlockDistrict
 } from "../src/game.js";
 import {
-  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, LEGACY_TAXI_V4_SAVE_KEY, loadProfile,
+  exportSave, importSave, LEGACY_SAVE_KEY, LEGACY_TAXI_SAVE_KEY, LEGACY_TAXI_V2_SAVE_KEY, LEGACY_TAXI_V4_SAVE_KEY, LEGACY_TAXI_V5_SAVE_KEY, loadProfile,
   SAVE_KEY, saveProfile, validateProfile
 } from "../src/save.js";
 import { getMapTransform } from "../src/renderer.js";
@@ -49,6 +49,7 @@ function fullyUnlockedProfile() {
   const profile = newProfile();
   return {
     ...profile,
+    districtsUnlocked: DISTRICTS.map((district) => district.id),
     stageProgress: Object.fromEntries(DISTRICTS.map((district) => [district.id, {
       fares: district.objective.fares,
       onTimeFares: district.objective.onTimeFares,
@@ -62,7 +63,7 @@ test("new driver starts with a working car, visible passengers, and an open neig
   const shift = createShift(profile, DISTRICTS[0].id, constantRandom(.5));
   assert.equal(profile.cashCents, 40_000);
   assert.equal(shift.fuel, 48);
-  assert.equal(shift.status, "idle");
+  assert.equal(shift.status, "driving");
   assert.equal(shift.passengers.filter((person) => person.state === "waiting").length, 6);
   assert.equal(availableDistricts(profile).length, 1);
   assert.equal(availableDistricts(fullyUnlockedProfile()).length, 5);
@@ -88,7 +89,45 @@ test("stage objectives gate neighborhood unlocks until fare, on-time, and coin g
     ...firstFare.profile.stageProgress,
     "old-town": { fares: 2, onTimeFares: 1, coins: 1 }
   };
-  assert.equal(availableDistricts({ ...firstFare.profile, stageProgress: progress }).length, 2);
+  const ready = { ...firstFare.profile, stageProgress: progress };
+  assert.equal(availableDistricts(ready).length, 1);
+  assert.equal(canUnlockDistrict(ready, "maple-heights"), true);
+  const unlock = unlockDistrict(ready, "maple-heights");
+  assert.equal(unlock.ok, true);
+  assert.equal(unlock.profile.cashCents, ready.cashCents - DISTRICTS[1].entryFeeCents);
+  assert.equal(availableDistricts(unlock.profile).length, 2);
+  assert.equal(unlockDistrict(unlock.profile, "maple-heights").ok, false);
+});
+
+test("a completed challenge still requires enough driver earnings to buy the next entry permit", () => {
+  const profile = newProfile();
+  const completed = {
+    ...profile,
+    cashCents: DISTRICTS[1].entryFeeCents - 1,
+    stageProgress: {
+      ...profile.stageProgress,
+      "old-town": { fares: 2, onTimeFares: 1, coins: 1 }
+    }
+  };
+  assert.equal(canUnlockDistrict(completed, "maple-heights"), false);
+  const denied = unlockDistrict(completed, "maple-heights");
+  assert.equal(denied.ok, false);
+  assert.match(denied.message, /more in driver earnings/);
+  assert.equal(denied.profile.cashCents, completed.cashCents);
+
+  const outOfOrder = { ...fullyUnlockedProfile(), districtsUnlocked: [DISTRICTS[0].id] };
+  assert.equal(canUnlockDistrict(outOfOrder, "riverside"), false);
+  assert.equal(unlockDistrict(outOfOrder, "riverside").ok, false);
+});
+
+test("a driver can free-drive and accelerate before selecting a passenger", () => {
+  const profile = newProfile();
+  const shift = createShift(profile, DISTRICTS[0].id, constantRandom(.5));
+  assert.equal(shift.trip, null);
+  const result = advanceShift(shift, { accelerate: true }, .06, profile);
+  assert.ok(result.shift.speed > 0);
+  assert.ok(result.shift.x !== shift.x || result.shift.y !== shift.y);
+  assert.equal(result.shift.passengers.filter((person) => person.state === "waiting").length, 6);
 });
 
 test("passenger boards only when the taxi is parked beside the selected curbside rider", () => {
@@ -125,6 +164,8 @@ test("a fare must be parked at its destination before payout and district progre
   assert.equal(result.profile.districtsVisited[0], DISTRICTS[0].id);
   assert.equal(result.profile.totalMeters, shift.trip.rideMeters);
   assert.equal(dropOffPassenger(result.shift, result.profile).ok, false);
+  const freeDrive = advanceShift(result.shift, { accelerate: true }, .06, result.profile);
+  assert.ok(freeDrive.shift.speed > 0);
 });
 
 test("driving over map coins awards persistent coins and stage objective progress once", () => {
@@ -207,7 +248,7 @@ test("unaffordable full damage restarts the current district and resets only its
     if (result.restarted) break;
   }
   assert.equal(result.restarted, true);
-  assert.equal(shift.status, "idle");
+  assert.equal(shift.status, "driving");
   assert.equal(shift.damage, 0);
   assert.equal(result.profile.cashCents, 500);
   assert.equal(result.profile.coins, 7);
@@ -335,7 +376,7 @@ test("taxi v3 saves migrate progress and settings without removing the source ba
   assert.equal(profile.rides, 2);
   assert.deepEqual(profile.upgrades, ["eco-tune"]);
   assert.equal(profile.settings.sound, true);
-  assert.equal(profile.version, 5);
+  assert.equal(profile.version, 6);
   assert.equal(availableDistricts(profile).length, 3);
   assert.equal(storage.stored.has(LEGACY_TAXI_SAVE_KEY), true);
   assert.equal(storage.stored.has(SAVE_KEY), true);
@@ -345,7 +386,7 @@ test("taxi v2 saves migrate using the preserved legacy key", () => {
   const previous = { ...newProfile(), version: 2, cashCents: 5000, rides: 1 };
   const storage = memoryStorage([[LEGACY_TAXI_V2_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 5);
+  assert.equal(profile.version, 6);
   assert.equal(profile.cashCents, 5000);
   assert.equal(availableDistricts(profile).length, 2);
 });
@@ -366,7 +407,7 @@ test("a broken current save falls back to the latest valid legacy backup", () =>
     [LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]
   ]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 5);
+  assert.equal(profile.version, 6);
   assert.equal(profile.coins, 11);
   assert.equal(profile.cashCents, 9600);
   assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 3 });
@@ -386,11 +427,30 @@ test("taxi v4 saves migrate without losing coins or neighborhood objective progr
   };
   const storage = memoryStorage([[LEGACY_TAXI_V4_SAVE_KEY, JSON.stringify(previous)]]);
   const profile = loadProfile(storage);
-  assert.equal(profile.version, 5);
+  assert.equal(profile.version, 6);
   assert.equal(profile.coins, 17);
   assert.equal(profile.cashCents, 12800);
   assert.deepEqual(profile.stageProgress["old-town"], { fares: 1, onTimeFares: 1, coins: 2 });
   assert.equal(storage.stored.has(LEGACY_TAXI_V4_SAVE_KEY), true);
+});
+
+test("taxi v5 saves migrate with previously earned neighborhood access", () => {
+  const previous = {
+    ...newProfile(),
+    version: 5,
+    cashCents: 17800,
+    stageProgress: {
+      ...newProfile().stageProgress,
+      "old-town": { fares: 2, onTimeFares: 1, coins: 1 },
+      "maple-heights": { fares: 2, onTimeFares: 1, coins: 3 }
+    }
+  };
+  const storage = memoryStorage([[LEGACY_TAXI_V5_SAVE_KEY, JSON.stringify(previous)]]);
+  const profile = loadProfile(storage);
+  assert.equal(profile.version, 6);
+  assert.equal(profile.cashCents, 17800);
+  assert.deepEqual(profile.districtsUnlocked, ["old-town", "maple-heights", "riverside"]);
+  assert.equal(storage.stored.has(LEGACY_TAXI_V5_SAVE_KEY), true);
 });
 
 test("old courier saves migrate credits and settings without losing the source backup", () => {

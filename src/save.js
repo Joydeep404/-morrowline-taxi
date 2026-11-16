@@ -1,7 +1,8 @@
 import { DISTRICTS, GARAGE_ITEMS } from "./districts.js";
 import { newProfile, SAVE_VERSION } from "./game.js";
 
-export const SAVE_KEY = "morrowline.taxi-save.v5";
+export const SAVE_KEY = "morrowline.taxi-save.v6";
+export const LEGACY_TAXI_V5_SAVE_KEY = "morrowline.taxi-save.v5";
 export const LEGACY_TAXI_V4_SAVE_KEY = "morrowline.taxi-save.v4";
 export const LEGACY_TAXI_SAVE_KEY = "morrowline.taxi-save.v3";
 export const LEGACY_TAXI_V2_SAVE_KEY = "morrowline.taxi-save.v2";
@@ -20,6 +21,11 @@ export function validateProfile(value) {
     throw new Error("Save file has invalid garage equipment.");
   }
   const districts = new Set(DISTRICTS.map((district) => district.id));
+  if (!Array.isArray(value.districtsUnlocked) ||
+      value.districtsUnlocked[0] !== DISTRICTS[0].id ||
+      !value.districtsUnlocked.every((id, index) => districts.has(id) && DISTRICTS[index]?.id === id)) {
+    throw new Error("Save file has invalid neighborhood unlocks.");
+  }
   if (!Array.isArray(value.districtsVisited) || !value.districtsVisited.every((id) => districts.has(id))) {
     throw new Error("Save file has invalid neighborhood history.");
   }
@@ -31,6 +37,15 @@ export function validateProfile(value) {
     const progress = value.stageProgress[district.id];
     if (!progress || !["fares", "onTimeFares", "coins"].every((key) => Number.isSafeInteger(progress[key]) && progress[key] >= 0)) {
       throw new Error("Save file has invalid stage objective progress.");
+    }
+  }
+  for (let index = 1; index < value.districtsUnlocked.length; index += 1) {
+    const previous = DISTRICTS[index - 1];
+    const progress = value.stageProgress[previous.id];
+    if (progress.fares < previous.objective.fares ||
+        progress.onTimeFares < previous.objective.onTimeFares ||
+        progress.coins < previous.objective.coins) {
+      throw new Error("Save file unlocks a neighborhood before completing its challenge.");
     }
   }
   if (!Number.isFinite(value.totalMeters) || value.totalMeters < 0 || !Number.isSafeInteger(value.cleanRides) || value.cleanRides < 0) {
@@ -58,6 +73,7 @@ function migrateCourierSave(storage) {
   migrated.cashCents = previous.credits * 100;
   migrated.rides = Array.isArray(previous.completed) ? previous.completed.length : 0;
   migrateStageProgress(migrated);
+  migrated.districtsUnlocked = unlockedDistrictIds(migrated);
   migrated.districtsVisited = migrated.rides > 0 ? [DISTRICTS[0].id] : [];
   migrated.settings = {
     sound: previous.settings?.sound === true,
@@ -76,6 +92,20 @@ function migrateStageProgress(profile) {
       coins: district.objective.coins
     };
   }
+}
+
+function unlockedDistrictIds(profile) {
+  const unlocked = [DISTRICTS[0].id];
+  for (let index = 1; index < DISTRICTS.length; index += 1) {
+    const previous = DISTRICTS[index - 1];
+    const progress = profile.stageProgress[previous.id];
+    const objective = previous.objective;
+    if (progress.fares < objective.fares ||
+        progress.onTimeFares < objective.onTimeFares ||
+        progress.coins < objective.coins) break;
+    unlocked.push(DISTRICTS[index].id);
+  }
+  return unlocked;
 }
 
 function migrateTaxiSave(storage, key, version) {
@@ -111,6 +141,7 @@ function migrateTaxiSave(storage, key, version) {
       }
     }
   }
+  migrated.districtsUnlocked = unlockedDistrictIds(migrated);
   migrated.totalMeters = Number.isFinite(previous.totalMeters) && previous.totalMeters >= 0 ? previous.totalMeters : 0;
   migrated.cleanRides = Number.isSafeInteger(previous.cleanRides) && previous.cleanRides >= 0 ? previous.cleanRides : 0;
   migrated.settings = {
@@ -121,7 +152,8 @@ function migrateTaxiSave(storage, key, version) {
 }
 
 function loadLegacyProfile(storage) {
-  const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
+  const migrated = migrateTaxiSave(storage, LEGACY_TAXI_V5_SAVE_KEY, 5) ??
+    migrateTaxiSave(storage, LEGACY_TAXI_V4_SAVE_KEY, 4) ??
     migrateTaxiSave(storage, LEGACY_TAXI_SAVE_KEY, 3) ??
     migrateTaxiSave(storage, LEGACY_TAXI_V2_SAVE_KEY, 2) ??
     migrateCourierSave(storage);
