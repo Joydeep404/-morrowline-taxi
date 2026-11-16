@@ -355,11 +355,13 @@ function renderWalletPanel() {
   const shopPriceEth = pendingShop?.type === "purchase" ? formatEth(pendingShop.priceWei) : "";
   const defaultShopMessage = !shopReady ? "Shop contract is not deployed/configured yet. Items are inactive until a Sepolia contract address is configured." :
     wallet.state === "connected" ? "Reading your on-chain item inventory…" : "Connect MetaMask on Sepolia to view your items.";
+  const contractsReady = shopReady && contractReady;
   return `<section class="wallet-drawer panel" id="wallet-panel" hidden>
     <div class="panel-heading"><div><span class="eyebrow">OPTIONAL SEPOLIA FEATURES</span><h2>Wallet & leaderboard</h2></div><button class="icon-button" data-action="wallet-close" aria-label="Close wallet panel">×</button></div>
     <p class="wallet-description">Play without a wallet. Local Morrow coins and upgrades are not crypto. Publishing progress makes your wallet address and stage/fare totals public on Sepolia and costs test ETH; entries are self-reported.</p>
     <div class="wallet-state-card"><span class="wallet-dot ${wallet.state}"></span><div><b>${wallet.state === "connected" ? `Connected · ${escapeText(shortenAddress(wallet.address))}` : wallet.state === "wrong-network" ? `Wrong network · ${escapeText(shortenAddress(wallet.address))}` : wallet.state === "unavailable" ? "MetaMask not detected" : "Wallet disconnected"}</b><p>${escapeText(walletMessage || wallet.message)}</p></div></div>
     <div class="wallet-actions"><button class="button button-secondary" data-action="wallet-connect" ${wallet.state === "unavailable" ? "disabled" : ""}>Connect MetaMask</button><button class="button button-secondary" data-action="wallet-switch" ${wallet.state === "unavailable" ? "disabled" : ""}>Switch to Sepolia</button></div>
+    ${!contractsReady ? `<p class="wallet-feature-note" role="status">MetaMask is ${wallet.state === "connected" ? "connected to Sepolia" : "separate from the game contracts"}, but no shop or leaderboard contract is deployed/configured for this site yet. Wallet connection alone cannot enable purchases or leaderboard reads. Deployment needs a one-time Sepolia transaction; the shop buttons stay disabled until its address is configured.</p>` : ""}
     <div class="onchain-shop"><div class="leaderboard-heading"><b>SEPOLIA TEST-ETH SHOP</b><span>TEST NETWORK ONLY</span></div>
       <p class="shop-description">One-time car paint and consumable fuel/repair boosts use Sepolia test ETH. Network gas is additional; review every amount in MetaMask. No real-money payments.</p>
       ${products}

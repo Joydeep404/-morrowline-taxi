@@ -176,10 +176,12 @@ a { color: inherit; }
 .setting-row input:focus-visible + .toggle { outline:2px solid #f1cf91;outline-offset:3px; }
 .backup-actions { display:flex;justify-content:space-between;gap:8px;margin-top:8px; }.backup-actions .text-button { font-size:7px; }.save-note { margin:7px 0 0;color:#7a8992;font-size:7px;line-height:1.5; }
 .footer { max-width:1540px;margin:auto;padding:0 3.2% 20px;display:flex;align-items:center;gap:17px;color:#697982;font:7px "Consolas",monospace;letter-spacing:.06em; }.footer a { margin-left:auto;color:#b29a6f;text-decoration:none; }.footer a:hover { color:#e4c68e; }
-.wallet-drawer { position:fixed;z-index:10;top:83px;right:max(3.2%,calc((100vw - 1540px)/2 + 3.2%));width:min(410px,calc(100vw - 24px));padding:19px;box-shadow:0 20px 70px rgba(0,0,0,.62); }.wallet-drawer[hidden] { display:none; }
+.wallet-drawer { position:fixed;z-index:10;top:83px;right:max(3.2%,calc((100vw - 1540px)/2 + 3.2%));width:min(410px,calc(100vw - 24px));max-height:calc(100vh - 99px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:19px;box-shadow:0 20px 70px rgba(0,0,0,.62); }.wallet-drawer[hidden] { display:none; }
+@supports (height: 100dvh) { .wallet-drawer { max-height:calc(100dvh - 99px); } }
 .icon-button { width:30px;height:30px;border:1px solid rgba(206,193,166,.19);background:transparent;color:var(--muted);cursor:pointer;font-size:20px; }
 .wallet-description { color:#a9b5c0;font-size:10px;line-height:1.6; }.wallet-state-card { display:flex;gap:10px;padding:11px;border:1px solid rgba(200,190,165,.16);background:rgba(0,0,0,.12); }
 .wallet-state-card .wallet-dot { margin:5px 0 0;flex:0 0 auto; }.wallet-state-card b { color:#e1d7c6;font-size:10px; }.wallet-state-card p { margin:4px 0 0;color:#95a4b4;font-size:9px;line-height:1.45; }
+.wallet-feature-note { margin:10px 0;padding:9px 10px;border-left:2px solid #d6ad70;background:rgba(214,173,112,.07);color:#c3c4bb;font-size:9px;line-height:1.5; }
 .wallet-actions { display:flex;flex-wrap:wrap;gap:8px;margin:12px 0; }.wallet-actions .button { min-height:34px;font-size:9px; }.keepsake-card { display:flex;gap:10px;padding:12px 0;border-top:1px solid rgba(206,193,166,.12);border-bottom:1px solid rgba(206,193,166,.12); }
 .keepsake-seal { width:33px;height:33px;flex:0 0 auto;display:grid;place-items:center;border:1px solid rgba(215,170,105,.4);border-radius:50%;color:#e4c68e; }.keepsake-card b { color:#e0d1b3;font:500 14px Georgia,serif; }
 .keepsake-card p { margin:5px 0;color:#9eabb8;font-size:9px;line-height:1.5; }.keepsake-card small { color:#aa8d63;font:8px "Consolas",monospace; }

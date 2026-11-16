@@ -59,6 +59,8 @@ The game itself is a static website; Sepolia cannot host the web app. MetaMask i
 
 The optional Sepolia shop accepts **test ETH only**: Sunset/Tidal paint costs 0.00015 ETH once per paint; Fuel Boost and Repair Kit each cost 0.00005 ETH per use. Network gas is additional and shown separately before MetaMask asks for approval. Consumables are applied only after a successful on-chain receipt. The source contract is `contracts/MorrowlineTestnetShop.sol`; the store remains inactive until that contract is deployed to Sepolia and its address is set in `src/shop-config.js`. Purchases are held by the contract and can be withdrawn only by its deployer. Never share recovery phrases, passwords, private keys, or login codes.
 
+Connecting MetaMask does not deploy or activate the shop. If the wallet panel says the contract is not deployed/configured and the Buy buttons are disabled, the shop is not yet available on the public site. The leaderboard also needs its own deployed address in `src/leaderboard-config.js`. The wallet panel can be scrolled independently on shorter screens.
+
 The optional top-ten leaderboard source is `contracts/MorrowlineLeaderboard.sol`; no leaderboard contract is deployed or configured. If enabled, submitted wallet addresses and scores are public and self-reported.
 
 ## Test and build
