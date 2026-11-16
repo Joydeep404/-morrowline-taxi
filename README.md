@@ -61,6 +61,8 @@ The optional Sepolia shop accepts **test ETH only**: Sunset/Tidal paint costs 0.
 
 Connecting MetaMask does not deploy or activate the shop. If the wallet panel says the contract is not deployed/configured and the Buy buttons are disabled, the shop is not yet available on the public site. The leaderboard also needs its own deployed address in `src/leaderboard-config.js`. The wallet panel can be scrolled independently on shorter screens.
 
+To deploy the shop, run `npm run compile:shop`, start the local server with `npm run dev`, then open `http://localhost:4173/scripts/deploy-shop.html` in a browser with MetaMask. The deployment page estimates gas first and requires a separate confirmation in MetaMask. After deployment, set the reported contract address in `src/shop-config.js` and publish the site again. This page deploys the shop only; it does not deploy the leaderboard.
+
 The optional top-ten leaderboard source is `contracts/MorrowlineLeaderboard.sol`; no leaderboard contract is deployed or configured. If enabled, submitted wallet addresses and scores are public and self-reported.
 
 ## Test and build

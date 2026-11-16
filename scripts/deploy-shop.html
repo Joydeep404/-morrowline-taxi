@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deploy Morrowline Sepolia Shop</title>
+    <style>
+      body { margin: 0; padding: 32px 16px; background: #101923; color: #edf0e9; font: 15px "Segoe UI", sans-serif; }
+      main { max-width: 620px; margin: auto; padding: 24px; border: 1px solid #45535d; background: #1d2b39; }
+      h1 { margin-top: 0; color: #e3c88e; font: 600 24px Georgia, serif; }
+      p, li { color: #b7c1c4; line-height: 1.55; }
+      .warning { padding: 12px; border-left: 3px solid #d6ad70; background: #273545; }
+      button { margin: 8px 8px 8px 0; padding: 10px 14px; border: 1px solid #d6ad70; background: #263745; color: #f0d7a4; cursor: pointer; }
+      button:disabled { opacity: .45; cursor: not-allowed; }
+      output { display: block; min-height: 32px; margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: #c5d5c6; }
+      a { color: #9ebdc1; }
+      code { color: #f0cf87; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Morrowline Sepolia Shop Deployment</h1>
+      <p class="warning">This deploys the shop contract from your MetaMask account to Sepolia. It uses Sepolia test ETH for network gas only. Check the account and network in MetaMask before approving; never enter a seed phrase or private key here.</p>
+      <ol>
+        <li>Connect MetaMask and make sure it is set to Sepolia.</li>
+        <li>Estimate deployment gas and review the maximum fee.</li>
+        <li>Choose Deploy and confirm the transaction in MetaMask.</li>
+      </ol>
+      <button id="connect">Connect MetaMask</button>
+      <button id="prepare" disabled>Estimate deployment fee</button>
+      <button id="deploy" disabled>Deploy shop</button>
+      <output id="status" role="status" aria-live="polite">No transaction has been sent.</output>
+    </main>
+    <script type="module">
+      const SEPOLIA = "0xaa36a7";
+      const status = document.querySelector("#status");
+      const prepareButton = document.querySelector("#prepare");
+      const deployButton = document.querySelector("#deploy");
+      let account = null;
+      let transaction = null;
+
+      function show(message) {
+        status.textContent = message;
+      }
+
+      async function connect() {
+        if (!window.ethereum?.request) throw new Error("MetaMask was not detected in this browser.");
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const chainId = await window.ethereum.request({ method: "eth_chainId" });
+        if (!Array.isArray(accounts) || !/^0x[0-9a-f]{40}$/i.test(accounts[0] ?? "")) {
+          throw new Error("MetaMask did not return a valid account.");
+        }
+        account = accounts[0];
+        if (chainId !== SEPOLIA) {
+          prepareButton.disabled = true;
+          transaction = null;
+          throw new Error("The connected wallet is not on Sepolia. Switch networks in MetaMask, then connect again.");
+        }
+        prepareButton.disabled = false;
+        show(`Connected ${account} on Sepolia. No transaction sent.`);
+      }
+
+      document.querySelector("#connect").addEventListener("click", async () => {
+        try {
+          await connect();
+        } catch (error) {
+          show(`Could not connect: ${error.message}`);
+        }
+      });
+
+      prepareButton.addEventListener("click", async () => {
+        prepareButton.disabled = true;
+        deployButton.disabled = true;
+        try {
+          if (!account || await window.ethereum.request({ method: "eth_chainId" }) !== SEPOLIA) {
+            throw new Error("Connect MetaMask on Sepolia first.");
+          }
+          const artifactResponse = await fetch("../contracts/artifacts/MorrowlineTestnetShop.json", { cache: "no-store" });
+          if (!artifactResponse.ok) throw new Error("Shop artifact is missing. Run `npm run compile:shop` from the repository root.");
+          const artifact = await artifactResponse.json();
+          if (artifact.contractName !== "MorrowlineTestnetShop" || !/^0x[0-9a-f]+$/i.test(artifact.bytecode ?? "")) {
+            throw new Error("The compiled shop artifact is invalid.");
+          }
+          const base = { from: account, data: artifact.bytecode };
+          const [estimate, gasPrice] = await Promise.all([
+            window.ethereum.request({ method: "eth_estimateGas", params: [base] }),
+            window.ethereum.request({ method: "eth_gasPrice" })
+          ]);
+          const gas = BigInt(estimate) * 125n / 100n;
+          const price = BigInt(gasPrice);
+          transaction = { ...base, gas: `0x${gas.toString(16)}`, gasPrice: `0x${price.toString(16)}` };
+          const maxFeeWei = gas * price;
+          const maxFeeEth = `${maxFeeWei / 10n ** 18n}.${(maxFeeWei % 10n ** 18n).toString().padStart(18, "0")}`;
+          show(`Deployment prepared for ${account} on Sepolia.\nEstimated maximum network fee: ${maxFeeEth} Sepolia ETH.\nNo transaction has been sent. Choose Deploy shop, then review the final amount in MetaMask.`);
+          deployButton.disabled = false;
+        } catch (error) {
+          transaction = null;
+          show(`Could not estimate deployment: ${error.message}`);
+        } finally {
+          prepareButton.disabled = !account;
+        }
+      });
+
+      deployButton.addEventListener("click", async () => {
+        deployButton.disabled = true;
+        try {
+          const [accounts, chainId] = await Promise.all([
+            window.ethereum.request({ method: "eth_accounts" }),
+            window.ethereum.request({ method: "eth_chainId" })
+          ]);
+          if (!transaction || chainId !== SEPOLIA || accounts?.[0]?.toLowerCase() !== account?.toLowerCase()) {
+            throw new Error("The active account or network changed. Reconnect and estimate again.");
+          }
+          show("Requesting deployment approval in MetaMask. Check the Sepolia network and gas, then confirm only if the details match.");
+          const hash = await window.ethereum.request({ method: "eth_sendTransaction", params: [transaction] });
+          if (!/^0x[0-9a-f]{64}$/i.test(hash)) throw new Error("MetaMask returned an invalid transaction hash.");
+          show(`Deployment transaction sent: ${hash}\nWaiting for Sepolia confirmation…`);
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            const receipt = await window.ethereum.request({ method: "eth_getTransactionReceipt", params: [hash] });
+            if (receipt) {
+              if (receipt.status !== "0x1" || !/^0x[0-9a-f]{40}$/i.test(receipt.contractAddress ?? "")) {
+                throw new Error(`Deployment failed. Check transaction ${hash} on Sepolia Etherscan.`);
+              }
+              const address = receipt.contractAddress;
+              show(`Shop deployed successfully at:\n${address}\n\nTransaction: ${hash}\nUpdate src/shop-config.js with this address to activate the shop on the public site.`);
+              status.append(document.createElement("br"));
+              const explorerLink = document.createElement("a");
+              explorerLink.href = `https://sepolia.etherscan.io/address/${address}`;
+              explorerLink.target = "_blank";
+              explorerLink.rel = "noreferrer";
+              explorerLink.textContent = "View deployed contract on Sepolia Etherscan";
+              status.append(explorerLink);
+              transaction = null;
+              return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
+          throw new Error(`Confirmation timed out. Check transaction ${hash} on Sepolia Etherscan.`);
+        } catch (error) {
+          show(`Deployment was not completed: ${error.message}`);
+        } finally {
+          deployButton.disabled = true;
+        }
+      });
+    </script>
+  </body>
+</html>
